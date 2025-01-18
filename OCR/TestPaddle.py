@@ -1,4 +1,5 @@
 import os
+import time
 import unittest
 from OCR.PaddleManager import PaddleManager
 
@@ -36,6 +37,21 @@ class TestPaddleOCR(unittest.TestCase):
                 real_answer = self.dict_of_answers.get(filename, None)
                 self.assertIsNotNone(real_answer, f"Real answer for {filename} is not provided")
                 self.assertIn(real_answer, result, f"Expected: {real_answer}, got: {result}")
+
+    def test_speed(self):
+        paddle_manager = PaddleManager()
+        filename = "basic_test_case.png"
+        image_test = "./test_images/" + filename
+        self.assertTrue(os.path.isfile(image_test), f"file {image_test} does not exist")
+        time_now = time.time()
+        result = paddle_manager.text_from_image(image_test)
+        result = " ".join(result)
+        real_answer = self.dict_of_answers.get(filename, None)
+        self.assertIsNotNone(real_answer, f"Real answer for {filename} is not provided")
+        self.assertIn(real_answer, result, f"Expected: {real_answer}, got: {result}")
+        time_after = time.time()
+        time_diff = time_after - time_now
+        print(f"Time for {filename}: {time_diff} seconds")
 
 
 if __name__ == '__main__':
