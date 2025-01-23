@@ -1,8 +1,23 @@
 import cv2
 import numpy as np
+import tkinter as tk
+from tkinter import filedialog
 
 
-def enhance_image(image_path):
+def enhance_image():
+    # Open a file dialog to let the user choose an image
+    root = tk.Tk()
+    root.withdraw()  # Hide the root window
+    image_path = filedialog.askopenfilename(
+        title="Select an Image",
+        filetypes=[("Image Files", "*.jpg;*.jpeg;*.png;*.bmp;*.tif;*.tiff")],
+    )
+
+    # Check if the user selected a file
+    if not image_path:
+        print("No image selected.")
+        return
+
     # Load the image
     image = cv2.imread(image_path)
 
@@ -38,6 +53,5 @@ def enhance_image(image_path):
     cv2.destroyAllWindows()
 
 
-# Get the image path from the user
-image_path = "C:/Users/medin/Downloads/try2.jpeg"
-enhance_image(image_path)
+# Call the function
+enhance_image()
