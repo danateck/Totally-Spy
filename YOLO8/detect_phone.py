@@ -35,7 +35,7 @@ def get_phones_from_cords(image: Image, tuple_cord_points: list[CordsPoint]) -> 
 
 
 class DetectPhone:
-    min_confidence = 0.3
+    MIN_CONFIDENCE = 0.3
 
     def __init__(self, model_path="best.pt"):
         """Initialize the YOLO model for phone detection."""
@@ -47,7 +47,7 @@ class DetectPhone:
         results = self.model(image, verbose=False)
         phones = []
         for result in results[0].boxes:
-            if result.conf > self.min_confidence:
+            if result.conf > self.MIN_CONFIDENCE:
                 x1, y1, x2, y2 = map(int, result.xyxy[0])
                 phones.append((x1, y1, x2, y2, float(result.conf)))
         return phones
