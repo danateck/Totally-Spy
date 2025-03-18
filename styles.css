@@ -1,0 +1,109 @@
+/* General Terminal Styling */
+body {
+    background-color: black;
+    color: #00ff00;
+    font-family: 'Courier New', Courier, monospace;
+    text-align: left;
+    padding: 20px;
+}
+
+/* Terminal Box */
+.container {
+    width: 80%;
+    max-width: 800px;
+    margin: auto;
+    padding: 10px;
+    border: 2px solid #00ff00;
+    background-color: black;
+}
+
+
+/* Green Console-Like Headers */
+.logo {
+    font-size: 24px;
+    font-weight: bold;
+    text-transform: uppercase;
+    color: #00ff00;
+    border-bottom: 2px solid #00ff00;
+    padding-bottom: 10px;
+    text-align: center;
+}
+
+/* Buttons with Terminal Look */
+button {
+    background-color: black;
+    color: #00ff00;
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 16px;
+    border: 2px solid #00ff00;
+    padding: 10px 15px;
+    cursor: pointer;
+    text-transform: uppercase;
+}
+
+button:hover {
+    background-color: #00ff00;
+    color: black;
+}
+
+/* Terminal-Style Text Boxes */
+input, textarea {
+    background-color: black;
+    color: #00ff00;
+    font-family: 'Courier New', Courier, monospace;
+    border: 2px solid #00ff00;
+    padding: 10px;
+    width: 100%;
+    display: block;
+    margin-top: 10px;
+}
+
+/* Home Page Buttons Side by Side */
+.home-buttons {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 20px;
+}
+
+.home-buttons button {
+    flex: 1;
+    margin: 5px;
+}
+
+/* History Page Styling */
+.history-button {
+    display: block;
+    width: 100%;
+    padding: 12px;
+    margin: 10px 0;
+    text-align: left;
+    border: 2px solid #00ff00;
+    background-color: black;
+    color: #00ff00;
+}
+
+.history-button:hover {
+    background-color: #00ff00;
+    color: black;
+}
+
+/* Navigation Buttons */
+.nav-buttons {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 20px;
+}
+
+.nav-btn {
+    padding: 12px;
+    font-size: 14px;
+    background-color: black;
+    color: #00ff00;
+    border: 2px solid #00ff00;
+    text-transform: uppercase;
+}
+
+.nav-btn:hover {
+    background-color: #00ff00;
+    color: black;
+}
