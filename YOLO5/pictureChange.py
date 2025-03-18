@@ -5,7 +5,29 @@ from tkinter import filedialog
 
 
 def enhance_image():
-    # Open a file dialog to let the user choose an image
+    """
+    Enhances text clarity in an image by applying contrast enhancement,
+    noise reduction, sharpening, and binarization while making text slightly thinner.
+    """
+    image=loadPicture()
+    image_resized=resizePicture(image)
+    enhanced_gray=grayScale(image_resized)
+    # binary=reduceNoise(enhanced_gray)
+    # binary is optional, sometimes results are better without this functionality
+
+    cv2.imshow("Original Image", image_resized)
+    cv2.imshow("Enhanced Image", enhanced_gray)
+
+    # Save the enhanced image
+    cv2.imwrite("enhanced_text_image.jpg", enhanced_gray)
+    print("Enhanced image saved as 'enhanced_text_image.jpg'")
+
+    cv2.waitKey(0)
+    cv2.destroyAllWindows()
+
+
+def loadPicture():
+    # load picture from computer
     root = tk.Tk()
     root.withdraw()  # Hide the root window
     image_path = filedialog.askopenfilename(
@@ -13,45 +35,43 @@ def enhance_image():
         filetypes=[("Image Files", "*.jpg;*.jpeg;*.png;*.bmp;*.tif;*.tiff")],
     )
 
-    # Check if the user selected a file
     if not image_path:
         print("No image selected.")
         return
 
     # Load the image
     image = cv2.imread(image_path)
-
-    # Check if image is loaded
     if image is None:
         print("Error: Could not load the image.")
         return
+    return image
 
-    # Resize for consistency
-    scale_percent = 150  # Resize to 50% of original size for easier handling
-    width = int(image.shape[1] * scale_percent / 100)
-    height = int(image.shape[0] * scale_percent / 100)
-    dim = (width, height)
-    image_resized = cv2.resize(image, dim, interpolation=cv2.INTER_AREA)
+def resizePicture(image):
+    # Resize image while maintaining aspect ratio
+    max_width, max_height = 1000, 400
+    h, w = image.shape[:2]
+    scale = min(max_width / w, max_height / h)
+    new_w, new_h = int(w * scale), int(h * scale)
+    image_resized = cv2.resize(image, (new_w, new_h), interpolation=cv2.INTER_CUBIC)
+    return image_resized
 
+def grayScale(image_resized):
     # Convert to grayscale
     gray = cv2.cvtColor(image_resized, cv2.COLOR_BGR2GRAY)
 
-    # Apply Gaussian Blur to reduce noise
-    blurred = cv2.GaussianBlur(gray, (5, 5), 0)
+    # Apply CLAHE (Contrast Limited Adaptive Histogram Equalization) with reduced effect
+    clahe = cv2.createCLAHE(clipLimit=1.2, tileGridSize=(8, 8))
+    enhanced_gray = clahe.apply(gray)
+    return enhanced_gray
 
-    # Apply adaptive thresholding
-    thresh = cv2.adaptiveThreshold(
-        blurred, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2
-    )
-
-    # Show the original and processed images
-    cv2.imshow("Original Image", image_resized)
-    cv2.imshow("Enhanced Image", thresh)
-
-    # Wait for user to close the windows
-    cv2.waitKey(0)
-    cv2.destroyAllWindows()
+def reduceNoise(enhanced_gray):
+    # Apply Gaussian blur to reduce noise before binarization
+    denoised = cv2.GaussianBlur(enhanced_gray, (3, 3), 0)
+    # Apply fixed thresholding with a lower threshold value
+    _, binary = cv2.threshold(denoised, 141, 225, cv2.THRESH_BINARY)
+    return binary
 
 
-# Call the function
+
+# Run the function
 enhance_image()
