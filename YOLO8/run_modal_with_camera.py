@@ -1,7 +1,7 @@
 import cv2
 import numpy as np
 
-from YOLO5.detect_phone import DetectPhone, get_phones_from_cords, find_largest_phone_from_cords
+from YOLO8.detect_phone import DetectPhone, get_phones_from_cords, find_largest_phone_from_cords
 
 cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
 find_phones = DetectPhone()
