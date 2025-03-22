@@ -18,24 +18,22 @@ class OCR:
                          1. Full text from text_annotations.description
                          2. List of words with their bounding box coordinates
         """
-        image_bytes = self._convert_cv2_to_bytes(img)  # Convert OpenCV image to bytes
-        vision_image = vision.Image(content=image_bytes) # Convert bytes to image with format of google
+        image_bytes = self._convert_cv2_to_bytes(img)
+        vision_image = vision.Image(content=image_bytes) # Convert bytes to image with format for Google Vision Images
 
-        # Call the Vision API to detect text in the image
         response = self.client.text_detection(image=vision_image)
-        texts = response.text_annotations  # Full text annotations (all recognized text)
+        texts = response.text_annotations
 
-        # If no text is detected, return empty lists
         if not texts:
             return "", []
 
-        # Full text from the first text annotation
+        # Full message
         full_text = texts[0].description
 
         # Extract words and their bounding boxes
         word_data = [
             {"word": text.description, "cords": [(v.x, v.y) for v in text.bounding_poly.vertices]}
-            for text in texts[1:]  # Skip first entry since it's the full text
+            for text in texts[1:]
         ]
 
         return full_text, word_data
