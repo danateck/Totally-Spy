@@ -1,7 +1,10 @@
 import os
 import time
 import unittest
-from OCR.PaddleManager import PaddleManager
+
+import cv2
+
+from OCRManager import OCRManager
 
 class TestPaddleOCR(unittest.TestCase):
 
@@ -17,14 +20,13 @@ class TestPaddleOCR(unittest.TestCase):
     }
 
     def test_singleton(self):
-        paddle_manager1 = PaddleManager()
-        paddle_manager2 = PaddleManager()
+        ocr_manager1 = OCRManager()
+        ocr_manager2 = OCRManager()
 
-        self.assertIs(paddle_manager1, paddle_manager2, "PaddleManager is not a singleton")
-        self.assertIs(paddle_manager1.ocr, paddle_manager2.ocr, "Paddle is not a singleton")
+        self.assertIs(ocr_manager1, ocr_manager2, "OCRManager is not a singleton")
 
     def test_images(self):
-        paddle_manager = PaddleManager()
+        ocr_manager = OCRManager()
         image_dir = "./test_images"
         self.assertTrue(os.path.isdir(image_dir), f"Directory {image_dir} does not exist")
 
@@ -32,25 +34,28 @@ class TestPaddleOCR(unittest.TestCase):
             file_path = os.path.join(image_dir, filename)
 
             if filename.lower().endswith(('.png', '.jpg')):
-                result = paddle_manager.text_from_image(file_path)
-                result = " ".join(result)
+                img = cv2.imread(file_path)
+                result = ocr_manager.extract_text(img)
+                message_result = result[0]
                 real_answer = self.dict_of_answers.get(filename, None)
                 self.assertIsNotNone(real_answer, f"Real answer for {filename} is not provided")
-                self.assertIn(real_answer, result, f"Expected: {real_answer}, got: {result}")
+                self.assertIn(real_answer, message_result, f"Expected: {real_answer}, got: {message_result}")
 
     def test_speed(self):
-        paddle_manager = PaddleManager()
+        ocr_manager = OCRManager()
         filename = "basic_test_case.png"
         image_test = "./test_images/" + filename
         self.assertTrue(os.path.isfile(image_test), f"file {image_test} does not exist")
+        img = cv2.imread(image_test)
         time_now = time.time()
-        result = paddle_manager.text_from_image(image_test)
-        result = " ".join(result)
-        real_answer = self.dict_of_answers.get(filename, None)
-        self.assertIsNotNone(real_answer, f"Real answer for {filename} is not provided")
-        self.assertIn(real_answer, result, f"Expected: {real_answer}, got: {result}")
+        result = ocr_manager.extract_text(img)
         time_after = time.time()
         time_diff = time_after - time_now
+        message_result = result[0]
+        real_answer = self.dict_of_answers.get(filename, None)
+        self.assertIsNotNone(real_answer, f"Real answer for {filename} is not provided")
+        self.assertIn(real_answer, message_result, f"Expected: {real_answer}, got: {message_result}")
+
         print(f"Time for {filename}: {time_diff} seconds")
 
 
