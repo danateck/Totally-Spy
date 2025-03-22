@@ -1,17 +1,16 @@
-import string
 
 import cv2
 from google.cloud import vision
 from numpy import ndarray
 
-type TextRecognition =  list[Cords]
-type Cords = tuple[string, int]
+type TextRecognition =  list[dict[str,Cords]] #list[word,cords]
+type Cords = tuple[int, int] #tuple[x,y]
 
 class OCR:
     def __init__(self, client):
         self.client = client
 
-    def extract_text(self, img: ndarray) -> tuple[string,TextRecognition]:
+    def extract_text(self, img: ndarray) -> tuple[str,TextRecognition]:
         """
         Extracts text and bounding box coordinates from an image using Google Cloud Vision API.
         :param img: The image as an OpenCV format.
@@ -28,23 +27,16 @@ class OCR:
 
         # If no text is detected, return empty lists
         if not texts:
-            return [], []
+            return "", []
 
         # Full text from the first text annotation
         full_text = texts[0].description
 
-        # List to store words and their bounding box coordinates
-        word_data = []
-
-        # Iterate through the pages, blocks, paragraphs, and words
-        if response.full_text_annotation.pages:
-            for page in response.full_text_annotation.pages:
-                for block in page.blocks:
-                    for paragraph in block.paragraphs:
-                        for word in paragraph.words:
-                            word_text = ''.join([symbol.text for symbol in word.symbols])  # Combine word symbols
-                            vertices = word.bounding_box.vertices  # Bounding box coordinates
-                            word_data.append((word_text, vertices))
+        # Extract words and their bounding boxes
+        word_data = [
+            {"word": text.description, "cords": [(v.x, v.y) for v in text.bounding_poly.vertices]}
+            for text in texts[1:]  # Skip first entry since it's the full text
+        ]
 
         return full_text, word_data
 
