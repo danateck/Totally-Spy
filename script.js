@@ -1,5 +1,5 @@
 // Signup Function
-function signup() {
+async function signup() {
     let newUsername = document.getElementById("new-username").value;
     let newPassword = document.getElementById("new-password").value;
 
@@ -7,12 +7,29 @@ function signup() {
         alert("Please fill in both fields!");
         return;
     }
+    
+    let userData = {
+        username: newUsername,
+        password: newPassword
+    };
 
-    // Store credentials in localStorage
-    localStorage.setItem("username", newUsername);
-    localStorage.setItem("password", newPassword);
-    alert("Account created successfully! You can now log in.");
-    window.location.href = "index.html"; // Redirect to login page
+    try {
+        let response = await fetch("http://localhost:3000/signup", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(userData)
+        });
+
+        let result = await response.json();
+        alert(result.message);
+
+        if (response.ok) {
+            window.location.href = "index.html"; // Redirect to login page
+        }
+    }  catch (error) {
+        console.error("Error:", error);
+        alert("Signup failed!");
+    }
 }
 
 // Login Function
