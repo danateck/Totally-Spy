@@ -6,7 +6,7 @@ pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tessera
 
 
 
-video_path = 'croppedOtpVid.mov'
+video_path = 'croppedOtpVideo.mov'
 
 # define and initialzing OTP-related keywords and patterns
 otp_patterns = [
@@ -54,3 +54,4 @@ while cap.isOpened():
     frame_count += 1
 
 cap.release()
+#chage
