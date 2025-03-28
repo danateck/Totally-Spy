@@ -9,8 +9,8 @@ body {
 
 /* Terminal Box */
 .container {
-    width: 80%;
-    max-width: 800px;
+    width: 90%;
+    max-width: 500px;
     margin: auto;
     padding: 10px;
     border: 2px solid #00ff00;
@@ -39,6 +39,7 @@ button {
     padding: 10px 15px;
     cursor: pointer;
     text-transform: uppercase;
+    width: 100%;
 }
 
 button:hover {
@@ -48,12 +49,12 @@ button:hover {
 
 /* Terminal-Style Text Boxes */
 input, textarea {
-    background-color: black;
+    background-color: rgb(0, 0, 0);
     color: #00ff00;
     font-family: 'Courier New', Courier, monospace;
     border: 2px solid #00ff00;
     padding: 10px;
-    width: 100%;
+    width: calc(100% - 24px);
     display: block;
     margin-top: 10px;
 }
@@ -61,13 +62,8 @@ input, textarea {
 /* Home Page Buttons Side by Side */
 .home-buttons {
     display: flex;
-    justify-content: space-between;
-    margin-top: 20px;
-}
-
-.home-buttons button {
-    flex: 1;
-    margin: 5px;
+    flex-direction: column;
+    gap: 10px;
 }
 
 /* History Page Styling */
@@ -90,7 +86,8 @@ input, textarea {
 /* Navigation Buttons */
 .nav-buttons {
     display: flex;
-    justify-content: space-between;
+    flex-direction: column;
+    gap: 10px;
     margin-top: 20px;
 }
 
@@ -101,9 +98,45 @@ input, textarea {
     color: #00ff00;
     border: 2px solid #00ff00;
     text-transform: uppercase;
+    width: 100%;
 }
 
 .nav-btn:hover {
     background-color: #00ff00;
     color: black;
+}
+
+/* Media Queries for Better Mobile Compatibility */
+@media (max-width: 768px) {
+    .container {
+        width: 95%;
+    }
+    button {
+        font-size: 14px;
+    }
+    .nav-btn {
+        font-size: 12px;
+    }
+}
+
+
+/* Popup Message Styling */
+.popup-message {
+    position: fixed;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background-color: #00ff00;
+    color: black;
+    padding: 10px 20px;
+    border-radius: 5px;
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 16px;
+    z-index: 1000;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.popup-message.show {
+    opacity: 1;
 }

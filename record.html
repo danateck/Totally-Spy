@@ -20,4 +20,25 @@
     </div>
     <script src="script.js"></script>
 </body>
+<script>
+    // Popup Message Function
+    function showPopup(message) {
+        const popup = document.createElement('div');
+        popup.className = 'popup-message';
+        popup.innerText = message;
+
+        document.body.appendChild(popup);
+
+        setTimeout(() => {
+            popup.classList.add('show');
+        }, 10);
+
+        setTimeout(() => {
+            popup.classList.remove('show');
+            setTimeout(() => {
+                document.body.removeChild(popup);
+            }, 300);
+        }, 3000);
+    }
+</script>
 </html>

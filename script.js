@@ -1,35 +1,26 @@
+
+
+
 // Signup Function
-async function signup() {
+
+
+function signup() {
     let newUsername = document.getElementById("new-username").value;
     let newPassword = document.getElementById("new-password").value;
 
     if (newUsername === "" || newPassword === "") {
-        alert("Please fill in both fields!");
+        showPopup("Please fill in both fields!");
         return;
     }
     
-    let userData = {
-        username: newUsername,
-        password: newPassword
-    };
-
-    try {
-        let response = await fetch("http://localhost:3000/signup", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(userData)
-        });
-
-        let result = await response.json();
-        alert(result.message);
-
-        if (response.ok) {
-            window.location.href = "index.html"; // Redirect to login page
-        }
-    }  catch (error) {
-        console.error("Error:", error);
-        alert("Signup failed!");
-    }
+    // Store credentials in localStorage
+    localStorage.setItem("username", newUsername);
+    localStorage.setItem("password", newPassword);
+    showPopup("Account created successfully! You can now log in.");
+    setTimeout(() => {
+        window.location.href = "home.html";
+    }, 1000);
+    
 }
 
 // Login Function
@@ -41,9 +32,14 @@ function login() {
     let storedPassword = localStorage.getItem("password");
 
     if (username === storedUsername && password === storedPassword) {
-        window.location.href = "home.html";
-    } else {
-        alert("Incorrect username or password! Try again.");
+        
+            showPopup("Login successful!");
+            setTimeout(() => {
+                window.location.href = "home.html";
+            }, 1000);
+    } 
+    else {
+        showPopup("Incorrect username or password! Try again.");
     }
 }
 
@@ -84,11 +80,11 @@ function goForward() {
 
 
 function startRecording() {
-    alert("Recording started...");
+    showPopup("Recording started...");
 }
 
 function stopRecording() {
-    alert("Recording stopped...");
+    showPopup("Recording stopped...");
 }
 function uploadVideo() {
     document.getElementById("videoUpload").click(); // Opens file selection
@@ -97,6 +93,8 @@ function uploadVideo() {
 function handleVideoUpload(event) {
     let file = event.target.files[0];
     if (file) {
-        alert("Video '" + file.name + "' uploaded successfully!");
+        showPopup("Video '" + file.name + "' uploaded successfully!");
     }
 }
+
+
