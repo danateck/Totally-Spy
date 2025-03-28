@@ -1,4 +1,5 @@
 import re
+from typing import Tuple, List
 
 patterns = {
     "OTP": r"\b\d{5,6}\b",  # OTP can be 5 or 6 digits
@@ -10,15 +11,7 @@ patterns = {
     "DATE": r"\b\d{1,2}[-/.]\d{1,2}[-/.]\d{2,4}\b",  # Date format (e.g., 25/03/2023)
 }
 
-def recognize_data(text):
-    # Call classify_text function and print the result
-    results = classify_text(text)
-    for data, data_type in results:
-        print(f"data: {data} type: {data_type}")
-    print("\n---\n")
-
-# Function to classify numbers and emails inside text
-def classify_text(text):
+def classify_text(text)-> List[Tuple[str, str]]:
     detected = []
     # Go through each pattern and match it in the text
     for label, pattern in patterns.items():
@@ -26,7 +19,6 @@ def classify_text(text):
         for match in matches:
             # Ensure that each match is classified once
             detected.append((match, label))
-    return detected
+    return detected # results have data, data_type
 
-# Example test
 
