@@ -13,8 +13,6 @@ def enhance_image(image: ndarray) -> ndarray:
     # binary=reduceNoise(enhanced_gray)
     # binary is optional, sometimes results are better without this functionality
 
-    cv2.waitKey(0)
-    cv2.destroyAllWindows()
     return enhanced_gray
 
 def resizePicture(image: ndarray) -> ndarray:
