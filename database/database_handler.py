@@ -4,6 +4,10 @@ import bcrypt
 from dotenv import load_dotenv
 from cryptography.fernet import Fernet
 import binascii
+from typing import List, Tuple
+from fastapi import HTTPException
+import logging
+from typing import Optional
 
 # Load environment variables from .env file
 load_dotenv()
@@ -17,26 +21,26 @@ DB_CONFIG = {
     "port": os.getenv("DB_PORT"),
 }
 
+logger = logging.getLogger(__name__)  # Create a logger for notifications
+
 # Connect to PostgreSQL
 def get_db_connection():
     try:
-        conn = psycopg2.connect(**DB_CONFIG)
-        return conn
+        return psycopg2.connect(**DB_CONFIG)
     except Exception as e:
-        print("Database connection failed:", e)
-        return None
+        raise HTTPException(status_code=500, detail=f"Database connection failed: {str(e)}")
     
 #MASTER_KEY encrypts each user_key that is stored in db  
 MASTER_KEY = os.getenv("MASTER_KEY")
 if not MASTER_KEY:
-    raise ValueError("Master key is not set in environment variables")
+    raise HTTPException(status_code=500, detail="Master key is not set in environment variables")
 
 #user key is used to encrypt the scan results
-def encrypt_user_key(user_key):
+def encrypt_user_key(user_key: bytes) -> bytes:
     cipher = Fernet(MASTER_KEY)
     return cipher.encrypt(user_key)
 
-def decrypt_user_key(encrypted_key):
+def decrypt_user_key(encrypted_key: bytes) -> bytes:
     cipher = Fernet(MASTER_KEY)
     return cipher.decrypt(encrypted_key)
 
@@ -56,9 +60,8 @@ def create_users_table():
                     );
                 """)
                 conn.commit()
-                print("Users table created successfully.")
         except Exception as e:
-            print("Error creating table:", e)
+            logger.error(f"Error creating table: {e}")
         finally:
             conn.close()
 
@@ -77,15 +80,14 @@ def create_scan_history_table():
                     );
                 """)
                 conn.commit()
-                print("Scan history table created successfully.")
         except Exception as e:
-            print("Error creating table:", e)
+            logger.error(f"Error creating table: {e}")
         finally:
             conn.close()
 
 
 # Function to login a user
-def login_user(username, password):
+def login_user(username: str, password: str) -> bool:
     conn = get_db_connection()
     if conn:
         try:
@@ -98,21 +100,18 @@ def login_user(username, password):
                     stored_hashed_password = result[0]
                     # Check if the provided password matches the stored hash
                     if bcrypt.checkpw(password.encode('utf-8'), stored_hashed_password.encode('utf-8')):
-                        print("Login successful!")
                         return True  # User is authenticated
                     else:
-                        print("Incorrect password.")
-                        return False
+                        raise HTTPException(status_code=401, detail="Incorrect password")
                 else:
-                    print("Username not found.")
-                    return False
+                    raise HTTPException(status_code=404, detail="Username not found")
         except Exception as e:
-            print("Error during login:", e)
+            raise HTTPException(status_code=500, detail=f"Error during login: {str(e)}")
         finally:
             conn.close()
 
 # Function to insert a new user into the database
-def insert_user(username, password):
+def insert_user(username: str, password: str) -> int | None:
     conn = get_db_connection()
     if conn:
         try:
@@ -126,17 +125,17 @@ def insert_user(username, password):
                 )
                 user_id = cur.fetchone()[0]
                 conn.commit()
-                print("User added successfully with ID:", user_id)
+                logger.info(f"User added successfully with ID: {user_id}")
                 return user_id
         except psycopg2.Error as e:
             if e.pgcode == "23505":  # Unique constraint violation
-                print("Username already exists!")
+                logger.warning("Username already exists!")
             else:
-                print("Error inserting user:", e)
+                logger.error(f"Error inserting user: {e}")
         finally:
             conn.close()
 
-def insert_scan(username, detected_text):
+def insert_scan(username: str, detected_text: str) -> None:
     conn = get_db_connection()
     if conn:
         try: 
@@ -146,13 +145,13 @@ def insert_scan(username, detected_text):
                 user_id_row = cur.fetchone()
 
                 if user_id_row is None:
-                    print(f"No user found with username: {username}")
+                    logger.warning(f"No user found with username: {username}")
                     return None  # Return None if user is not found
                 
                 user_id = user_id_row[0]
                 encrypted_text = encrypt_data(user_id, detected_text)
                 if encrypted_text is None:
-                    print("Encryption failed!")
+                    logger.warning("Encryption failed!")
                     return
                 
                 cur.execute(
@@ -160,14 +159,15 @@ def insert_scan(username, detected_text):
                     (user_id, encrypted_text)
                 )
                 conn.commit()
-                print("Scan history added successfully.")
+                logger.info(f"Scan history added successfully!")
         except psycopg2.Error as e:
-            print("Error inserting scan history:", e)
+            logger.error(f"Error inserting scan history: {e}")
         finally:
             conn.close()
 
 
-def encrypt_data(user_id, plaintext):
+
+def encrypt_data(user_id: int, plaintext: str) -> Optional[str]:
     conn = get_db_connection()
     if conn:
         try:
@@ -184,7 +184,7 @@ def encrypt_data(user_id, plaintext):
                     encrypted_text = cipher.encrypt(plaintext.encode('utf-8'))
                     return encrypted_text
         except Exception as e:
-            print("Encryption error:", e)
+            logger.error(f"Encryption Error: {e}")
         finally:
             conn.close()
     return None
@@ -209,17 +209,16 @@ def decrypt_data(user_id, encrypted_text):
                     encrypted_text_cleaned = encrypted_text.replace('\\x', '')
                     encrypted_text_bytes = binascii.unhexlify(encrypted_text_cleaned)
                     decrypted_text = cipher.decrypt(encrypted_text_bytes).decode('utf-8')
-                    print("Decrypted text:", decrypted_text)
                 else:
-                    print("No encryption key found for the user!")
+                    logger.warning("No encryption key found for the user!")
         except Exception as e:
-            print("Decryption error:", e)  # This will print the exception message
+            logger.error(f"Encryption Error: {e}")
         finally:
             conn.close()
     return None
 
 
-def get_scan_history(username):
+def get_scan_history(username: str) -> List[Tuple[int, str, str]]:
     conn = get_db_connection()
     if conn:
         try:
@@ -235,17 +234,10 @@ def get_scan_history(username):
                     decrypted_scans = [(scan[0], scan[1], decrypt_data(user_id, scan[2])) for scan in scans]
                     return decrypted_scans
                 else:
-                    print("User not found.")
+                    logger.warning("No user found")
                     return []
         except Exception as e:
-            print("Error fetching scan history:", e)
+            logger.error(f"Error fetching scan history: {e}")
         finally:
             conn.close()
     return []
-
-
-
-# Run table creation when the script is executed
-if __name__ == "__main__":
-    #login_user("tom12","123")
-    get_scan_history("tom12")
