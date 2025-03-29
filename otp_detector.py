@@ -30,28 +30,36 @@ fps = cap.get(cv2.CAP_PROP_FPS)
 frame_interval = int(fps * 1)  # Process one frame per second
 
 frame_count = 0
+otp_seconds = []  # List to store detected OTP seconds
+
 while cap.isOpened():
     ret, frame = cap.read()
-    
+
     if not ret:
         break
-    
+
     # only process one frame per interval
     if frame_count % frame_interval == 0:
         # calculate the timestamp in seconds
         seconds = frame_count / fps
-        
+
         # convert frame to gray scale for better OCR accuracy
         gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        
+
         # apply OCR to extract text from the frame
         extracted_text = pytesseract.image_to_string(gray_frame)
-        
+
         # check ifs the text contains OTP-related content
         if contains_otp(extracted_text):
-            print(f"\n OTP Notification Detected at {int(seconds)} seconds")
-    
+            detected_second = int(seconds)
+            print(f"\n OTP Notification Detected at {detected_second} seconds")
+            otp_seconds.append(detected_second)
+
     frame_count += 1
 
 cap.release()
-#chage
+
+# Save detected seconds to otp_sec.txt file
+with open('otp_sec.txt', 'w') as f:
+    for sec in otp_seconds:
+        f.write(f'{sec}\n')

@@ -1,4 +1,3 @@
-
 import cv2
 import numpy as np
 import os
@@ -56,18 +55,18 @@ def extract_best_frame(video_path, output_folder, start_sec, end_sec, interval=0
         cv2.imwrite(best_path, best_frame)
         print(f"✅ Best frame saved for {session_name} at {best_time:.2f}s → {best_path}")
 
-def process_otp_screenshots(video_path, times_file="otp_times.txt"):
+def process_otp_screenshots(video_path, times_file="otp_sec.txt"):
     with open(times_file, "r") as f:
-        ranges = [line.strip().split(",") for line in f.readlines()]
+        times = [int(line.strip()) for line in f.readlines() if line.strip().isdigit()]
 
-    for idx, (start, end) in enumerate(ranges):
+    for idx, start_time in enumerate(times):
         extract_best_frame(
             video_path,
             output_folder=f"otp_screenshots/session_{idx+1}",
-            start_sec=float(start),
-            end_sec=float(end),
+            start_sec=start_time,
+            end_sec=start_time + 1,
             session_name=f"session_{idx+1}"
         )
 
 if __name__ == "__main__":
-    process_otp_screenshots("videos/otp_video.mp4")
+    process_otp_screenshots("croppedOtpVideo.mov")
