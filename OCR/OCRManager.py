@@ -1,4 +1,3 @@
-import string
 import threading
 
 from google.cloud import vision
@@ -24,7 +23,7 @@ class OCRManager:
     def get_client(self):
         return self.client
 
-    def extract_text(self, img: ndarray) -> tuple[string,TextRecognition]:
+    def extract_text(self, img: ndarray) -> tuple[str,TextRecognition]:
         """
         Extracts text and bounding box coordinates from an image using Google Cloud Vision API.
         :param img: The image as an OpenCV format.
