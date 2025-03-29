@@ -3,8 +3,8 @@ import cv2
 from google.cloud import vision
 from numpy import ndarray
 
-type TextRecognition =  list[dict[str,Cords]] #list[word,cords]
 type Cords = tuple[int, int] #tuple[x,y]
+type TextRecognition =  list[dict[str,Cords]] #list[word,cords]
 
 class OCR:
     def __init__(self, client):
@@ -20,10 +20,14 @@ class OCR:
         """
         image_bytes = self._convert_cv2_to_bytes(img)
         vision_image = vision.Image(content=image_bytes) # Convert bytes to image with format for Google Vision Images
+        if not vision_image:
+            return "", []
 
         response = self.client.text_detection(image=vision_image)
-        texts = response.text_annotations
+        if not response:
+            return "", []
 
+        texts = response.text_annotations
         if not texts:
             return "", []
 
@@ -35,7 +39,6 @@ class OCR:
             {"word": text.description, "cords": [(v.x, v.y) for v in text.bounding_poly.vertices]}
             for text in texts[1:]
         ]
-
         return full_text, word_data
 
     def _convert_cv2_to_bytes(self, img: ndarray) -> bytes:
