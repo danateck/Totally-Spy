@@ -45,6 +45,9 @@ class DetectPhone:
     def find_cord_for_phones(self, image: Image) -> list[CordsPoint]:
         """Detect phones in an image and return their bounding boxes and confidence scores."""
         results = self.model(image, verbose=False)
+        if not results:
+            return []
+
         phones = []
         for result in results[0].boxes:
             if result.conf > self.MIN_CONFIDENCE:
