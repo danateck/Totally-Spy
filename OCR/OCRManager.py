@@ -3,14 +3,14 @@ import threading
 from google.cloud import vision
 from numpy import ndarray
 
-from OCR import OCR, TextRecognition
+from OCR.OCR import OCR, TextRecognition
 
 
 class OCRManager:
     """Singleton class to manage the Google Vision API client."""
     _instance = None
     _lock = threading.Lock()
-    json_name = "../env/google-vision-api.json"
+    json_name = "./env/google-vision-api.json"
 
     def __new__(cls, json_key_file=json_name):
         with cls._lock:
