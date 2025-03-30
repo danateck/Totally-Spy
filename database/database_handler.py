@@ -4,7 +4,6 @@ import bcrypt
 from dotenv import load_dotenv
 from cryptography.fernet import Fernet
 import binascii
-from typing import List, Tuple
 from fastapi import HTTPException
 import logging
 from typing import Optional
@@ -55,7 +54,7 @@ def create_users_table():
                         id SERIAL PRIMARY KEY,
                         username TEXT UNIQUE NOT NULL,
                         password TEXT NOT NULL,
-                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                         encryption_key BYTEA
                     );
                 """)
@@ -218,7 +217,7 @@ def decrypt_data(user_id, encrypted_text):
     return None
 
 
-def get_scan_history(username: str) -> List[Tuple[int, str, str]]:
+def get_scan_history(username: str) -> list[tuple[int, str, str]]:
     conn = get_db_connection()
     if conn:
         try:
@@ -241,3 +240,4 @@ def get_scan_history(username: str) -> List[Tuple[int, str, str]]:
         finally:
             conn.close()
     return []
+
