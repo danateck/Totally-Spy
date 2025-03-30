@@ -1,7 +1,16 @@
 export interface ApiResponseFoundCode {
-  success: boolean;
-  type?: string;
-  message?: string;
+  message: string[];
 }
 
+export interface UserLogin {
+    username: string
+    password: string
+}
 
+export interface UserDetails {
+    username: string
+}
+
+export interface ImageData {
+    image: string
+}

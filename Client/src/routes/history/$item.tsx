@@ -5,54 +5,20 @@ import { Logo } from '@/components/logo/logo'
 
 export const Route = createFileRoute('/history/$item')({
   component: RouteComponent,
+  loader: async ({ params }) => {
+    const response = await fetch(`http://localhost:4000/history/record/${params.item}`,{credentials: 'include',})
+    if (!response.ok) {
+      throw new Error(`Error: ${response.status} - ${response.statusText}`)
+    }
+    return response.json()
+  },  
 })
 
 function RouteComponent() {
   useAuth() // Add authentication check
-  const { item } = Route.useParams()
-  const [data, setData] = useState<{
-    date: string;
-    processingStatus: boolean;
-    dataType: string;
-    content: string;
-  } | null>(null)
+  const data = Route.useLoaderData()
   const [error, setError] = useState<string | null>(null)
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    async function fetchRecordDetails() {
-      try {
-        const response = await fetch(`/record/${item}`)
-        
-        if (!response.ok) {
-          throw new Error(`Error: ${response.status} - ${response.statusText}`)
-        }
-
-        const contentType = response.headers.get('content-type')
-        if (contentType && contentType.includes('application/json')) {
-          const recordData = await response.json()
-          setData(recordData)
-        } else {
-          throw new Error('The server did not return valid JSON.')
-        }
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'An unexpected error occurred')
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    fetchRecordDetails()
-  }, [item])
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-b from-gray-900 to-gray-800 flex items-center justify-center">
-        <div className="text-gray-300 text-lg">Loading...</div>
-      </div>
-    )
-  }
-
+  
   if (error || !data) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-gray-900 to-gray-800">

@@ -29,25 +29,21 @@ function RouteComponent() {
 
   const handleCapture = async (imageSrc: string) => {
     try {
-      // const response = await fetch('/record/img', {
-      //   method: 'POST',
-      //   headers: {
-      //     'Content-Type': 'application/json',
-      //   },
-      //   body: JSON.stringify({ image: imageSrc })
-      // });
-      const response = {
-        ok: true,
-        json: () => Promise.resolve({ success: true, message: 'Code found!', type: 'OTP' })
-      }
-
+      const response = await fetch('http://localhost:4000/record/img', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({ image: imageSrc.split(',')[1] })
+      });
       const data: ApiResponseFoundCode = await response.json();
 
       if (!response.ok) {
         console.error('Failed to send image to server');
-      } else if (data.success) {
-        setAlertTitle(data.type || 'Success');
-        setAlertMessage(data.message || 'Code found!');
+      } else if (data.message.length > 0 && !data.message[0].includes('No')) {
+        setAlertTitle(data.message[0] || 'Success');
+        setAlertMessage(data.message[1] || 'Code found!');
         setShowAlert(true);
       }
     } catch (error) {

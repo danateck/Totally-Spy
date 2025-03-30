@@ -8,6 +8,8 @@ from fastapi import HTTPException
 import logging
 from typing import Optional
 
+from pydantic import BaseModel
+
 # Load environment variables from .env file
 load_dotenv()
 
@@ -21,6 +23,11 @@ DB_CONFIG = {
 }
 
 logger = logging.getLogger(__name__)  # Create a logger for notifications
+
+class User(BaseModel):
+    id: int
+    username: str
+    
 
 # Connect to PostgreSQL
 def get_db_connection():
@@ -84,6 +91,18 @@ def create_scan_history_table():
         finally:
             conn.close()
 
+def get_user_id(username: str) -> int:
+    conn = get_db_connection()
+    if conn:
+        try:
+            with conn.cursor() as cur:
+                cur.execute("SELECT id FROM users WHERE username = %s;", (username,))
+                result = cur.fetchone()
+                return result[0]
+        except Exception as e:
+            logger.error(f"Error getting user ID: {e}")
+        finally:
+            conn.close()    
 
 # Function to login a user
 def login_user(username: str, password: str) -> bool:
@@ -241,3 +260,72 @@ def get_scan_history(username: str) -> list[tuple[int, str, str]]:
             conn.close()
     return []
 
+def get_scan_history_by_id(record_id: int) -> list[tuple[int, str, str]]:
+    conn = get_db_connection()
+    if conn:
+        try:
+            with conn.cursor() as cur:
+                cur.execute("SELECT id, scan_time, detected_text FROM scan_history WHERE id = %s;", (record_id,))
+                scan = cur.fetchone()
+                decrypted_scan = [(scan[0], scan[1], decrypt_data(scan[2]))]
+                return decrypted_scan
+        except Exception as e:
+            logger.error(f"Error fetching scan history: {e}")
+        finally:
+            conn.close()
+
+
+def create_session_table():
+    conn = get_db_connection()
+    if conn:
+        try:
+            with conn.cursor() as cur:
+                cur.execute("CREATE TABLE IF NOT EXISTS sessions (id SERIAL PRIMARY KEY, user_id INTEGER REFERENCES users(id) ON DELETE CASCADE, session_id TEXT UNIQUE NOT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP);")
+                conn.commit()
+        except Exception as e:
+            logger.error(f"Error creating table: {e}")
+        finally:
+            conn.close()
+            
+def insert_session(user_id: int, session_id: str):
+    conn = get_db_connection()
+    if conn:
+        try:
+            with conn.cursor() as cur:
+                cur.execute("INSERT INTO sessions (user_id, session_id) VALUES (%s, %s);", (user_id, session_id))
+                conn.commit()   
+        except Exception as e:
+            logger.error(f"Error inserting session: {e}")
+        finally:
+            conn.close()
+            
+            
+def get_session(session_id: str) -> Optional[User]:
+    conn = get_db_connection()
+    if conn:
+        try:
+            with conn.cursor() as cur:
+                cur.execute("SELECT * FROM users WHERE id = (SELECT user_id FROM sessions WHERE session_id = %s);", (session_id,))
+                result = cur.fetchone() 
+                if result:
+                    return User(id=result[0], username=result[1])
+                else:
+                    return None
+        except Exception as e:
+            logger.error(f"Error getting session: {e}")
+        finally:
+            conn.close()
+    return None
+
+def delete_session(session_id: str):
+    conn = get_db_connection()
+    if conn:
+        try:
+            with conn.cursor() as cur:
+                cur.execute("DELETE FROM sessions WHERE session_id = %s;", (session_id,))
+                conn.commit()
+        except Exception as e:
+            logger.error(f"Error deleting session: {e}")    
+        finally:
+            conn.close()
+    return None

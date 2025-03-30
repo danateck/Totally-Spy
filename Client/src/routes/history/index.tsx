@@ -13,7 +13,7 @@ function RouteComponent() {
   useEffect(() => {
     async function fetchRecordings() {
       try {
-        const response = await fetch('/auth/recordings')
+        const response = await fetch('http://localhost:4000/history/recordings',{credentials: 'include'})
 
         // Check if the response is not okay (i.e., status code not in 2xx range)
         if (!response.ok) {
@@ -24,7 +24,7 @@ function RouteComponent() {
         const contentType = response.headers.get('content-type')
         if (contentType && contentType.includes('application/json')) {
           const data = await response.json()
-          setRecordings(data)
+          setRecordings(data.records)
         } else {
           throw new Error('The server did not return valid JSON.')
         }
@@ -35,7 +35,6 @@ function RouteComponent() {
 
     fetchRecordings()
   }, [])
-
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-900 to-gray-800">
       <div className="max-w-2xl mx-auto py-12 px-4 sm:px-6 lg:px-8">

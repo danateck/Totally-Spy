@@ -11,8 +11,10 @@ export default defineConfig({
     host: true, // Listen on all addresses
     allowedHosts: [
       'fun-present-tetra.ngrok-free.app',
-      '.ngrok-free.app' // This will allow all ngrok-free.app subdomains
+      '.ngrok-free.app', // This will allow all ngrok-free.app subdomains
+      'localhost:4000'
     ],
+    cors: true,
   },
   test: {
     globals: true,

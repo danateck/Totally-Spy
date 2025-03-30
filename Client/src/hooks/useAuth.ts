@@ -13,9 +13,10 @@ export function useAuth() {
 
   const login = async (username: string, password: string) => {
     try {
-      const response = await fetch('/auth/login', {
+      const response = await fetch('http://localhost:4000/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ username, password })
       })
 
