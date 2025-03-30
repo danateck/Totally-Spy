@@ -1,12 +1,15 @@
 import { Logo } from '@/components/logo/logo'
 import { createFileRoute } from '@tanstack/react-router'
 import { Link } from '@tanstack/react-router'
+import { useAuth } from '@/hooks/useAuth'
 
 export const Route = createFileRoute('/dashboard/')({
   component: DashboardComponent,
 })
 
 function DashboardComponent() {
+  useAuth() // This will handle the authentication check and redirect
+
   const handleUploadVideo = () => {
     // Implement file upload logic
     const input = document.createElement('input')

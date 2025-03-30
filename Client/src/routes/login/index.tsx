@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { createFileRoute, Link, useRouter } from '@tanstack/react-router'
 import { useState } from 'react'
+import { useAuth } from '@/hooks/useAuth'
 
 export const Route = createFileRoute('/login/')({
   component: LoginPage,
@@ -10,6 +11,7 @@ export const Route = createFileRoute('/login/')({
 
 function LoginPage() {
   const router = useRouter()
+  const { login } = useAuth()
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
@@ -17,17 +19,7 @@ function LoginPage() {
   async function handleLogin() {
     //TODO login
     try {
-      const response = await fetch('/api/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password })
-      })
-
-      if (!response.ok) {
-        throw new Error('Invalid credentials')
-      }
-
-      // Assume successful login
+      await login(username, password) // Add await here
       router.navigate({ to: '/dashboard' })
     } catch (err) {
       if (err instanceof Error) {

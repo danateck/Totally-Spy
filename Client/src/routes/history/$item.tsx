@@ -1,4 +1,6 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
+import { useEffect, useState } from 'react'
+import { useAuth } from '@/hooks/useAuth.ts'
 import { Logo } from '@/components/logo/logo'
 
 export const Route = createFileRoute('/history/$item')({
@@ -6,12 +8,62 @@ export const Route = createFileRoute('/history/$item')({
 })
 
 function RouteComponent() {
-  // In a real app, this would come from the route params and API
-  const data = {
-    date: 'March 18, 2024',
-    processingStatus: true,
-    dataType: 'Texts',
-    content: 'Alice texted Bob asking how he is doing...'
+  useAuth() // Add authentication check
+  const { item } = Route.useParams()
+  const [data, setData] = useState<{
+    date: string;
+    processingStatus: boolean;
+    dataType: string;
+    content: string;
+  } | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    async function fetchRecordDetails() {
+      try {
+        const response = await fetch(`/record/${item}`)
+        
+        if (!response.ok) {
+          throw new Error(`Error: ${response.status} - ${response.statusText}`)
+        }
+
+        const contentType = response.headers.get('content-type')
+        if (contentType && contentType.includes('application/json')) {
+          const recordData = await response.json()
+          setData(recordData)
+        } else {
+          throw new Error('The server did not return valid JSON.')
+        }
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'An unexpected error occurred')
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchRecordDetails()
+  }, [item])
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-gray-900 to-gray-800 flex items-center justify-center">
+        <div className="text-gray-300 text-lg">Loading...</div>
+      </div>
+    )
+  }
+
+  if (error || !data) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-gray-900 to-gray-800">
+        <div className="max-w-2xl mx-auto py-12 px-4 sm:px-6 lg:px-8">
+          <Logo className="mb-12" />
+          <div className="bg-gray-800 rounded-xl shadow-2xl p-8">
+            <p className="text-red-400 text-center">{error || 'Record not found'}</p>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (

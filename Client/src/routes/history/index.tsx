@@ -13,7 +13,7 @@ function RouteComponent() {
   useEffect(() => {
     async function fetchRecordings() {
       try {
-        const response = await fetch('/api/recordings')
+        const response = await fetch('/auth/recordings')
 
         // Check if the response is not okay (i.e., status code not in 2xx range)
         if (!response.ok) {
