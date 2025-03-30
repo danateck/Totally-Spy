@@ -7,7 +7,8 @@ from io import BytesIO
 from PIL import Image
 from fastapi.middleware.cors import CORSMiddleware
 from OCR.OCRManager import *
-
+from Data_recognition.data_type_recognition import classify_text
+from database.database_handler import *
 app = FastAPI()
 ocr_manager=OCRManager()
 
