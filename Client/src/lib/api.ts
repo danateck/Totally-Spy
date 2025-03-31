@@ -14,3 +14,5 @@ export interface UserDetails {
 export interface ImageData {
     image: string
 }
+
+export type Record = [number, string, string]; // [id, timestamp, data]

@@ -51,11 +51,11 @@ function RouteComponent() {
           </p>
         )}
         <div className="space-y-4">
-          {recordings.map((recording: { id: string; date: string }) => (
+          {recordings.map((recording: [number, string]) => (
             <Link
-              key={recording.id}
+              key={recording[0]}
               to="/history/$item"
-              params={{ item: recording.id }}
+              params={{ item: String(recording[0]) }}
               className="block w-full p-4 bg-gray-800 rounded-xl shadow-lg hover:shadow-xl transition-all duration-200 border border-gray-700 hover:border-gray-600 text-left group"
             >
               <div className="flex items-center justify-between">

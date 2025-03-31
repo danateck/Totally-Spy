@@ -72,7 +72,6 @@ def decode_base64_frame(base64_frame):
 
 @app.post("/record/img")
 async def search_info(image_data: ImageData, user: User = Depends(get_current_user)):
-    try:
         # Decode the base64 frame into ndarray (OpenCV-compatible image)
         frame = decode_base64_frame(image_data.image)
     
@@ -94,10 +93,6 @@ async def search_info(image_data: ImageData, user: User = Depends(get_current_us
             return {"message": detected_data}
         else:
             raise HTTPException(status_code=404, detail="No data found.")
-
-    except Exception as e:
-        logging.error(f"Error: {e}")
-        raise HTTPException(status_code=500, detail="Error.")
 
 
 @app.post("/auth/login")
@@ -147,8 +142,8 @@ async def get_records(user: User = Depends(get_current_user)):
     records = get_scan_history(user.username)
     return {"records": records}
 
-@app.get("/history/recorde/{record_id}")
+@app.get("/history/record/{record_id}")
 async def get_record(record_id: int, user: User = Depends(get_current_user)):
-    record = get_scan_history_by_id(record_id)
+    record = get_scan_history_by_id(user.id, record_id)
     return {"record": record}
 

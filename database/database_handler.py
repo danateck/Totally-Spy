@@ -159,15 +159,14 @@ def insert_scan(username: str, detected_text: str) -> None:
         try: 
             # Get the user_id based on the username
             with conn.cursor() as cur:
-                cur.execute("SELECT id FROM users WHERE username = %s;", (username,))
-                user_id_row = cur.fetchone()
+                user_id = get_user_id(username)
 
-                if user_id_row is None:
+                if user_id is None:
                     logger.warning(f"No user found with username: {username}")
                     return None  # Return None if user is not found
                 
-                user_id = user_id_row[0]
                 encrypted_text = encrypt_data(user_id, detected_text)
+                encrypted_text = detected_text
                 if encrypted_text is None:
                     logger.warning("Encryption failed!")
                     return
@@ -227,6 +226,7 @@ def decrypt_data(user_id, encrypted_text):
                     encrypted_text_cleaned = encrypted_text.replace('\\x', '')
                     encrypted_text_bytes = binascii.unhexlify(encrypted_text_cleaned)
                     decrypted_text = cipher.decrypt(encrypted_text_bytes).decode('utf-8')
+                    return decrypted_text
                 else:
                     logger.warning("No encryption key found for the user!")
         except Exception as e:
@@ -260,14 +260,14 @@ def get_scan_history(username: str) -> list[tuple[int, str, str]]:
             conn.close()
     return []
 
-def get_scan_history_by_id(record_id: int) -> list[tuple[int, str, str]]:
+def get_scan_history_by_id(user_id: int, record_id: int) -> list[tuple[int, str, str]]:
     conn = get_db_connection()
     if conn:
         try:
             with conn.cursor() as cur:
                 cur.execute("SELECT id, scan_time, detected_text FROM scan_history WHERE id = %s;", (record_id,))
                 scan = cur.fetchone()
-                decrypted_scan = [(scan[0], scan[1], decrypt_data(scan[2]))]
+                decrypted_scan = [(scan[0], scan[1], scan[2])]
                 return decrypted_scan
         except Exception as e:
             logger.error(f"Error fetching scan history: {e}")

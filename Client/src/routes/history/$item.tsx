@@ -2,6 +2,21 @@ import { createFileRoute, Link } from '@tanstack/react-router'
 import { useEffect, useState } from 'react'
 import { useAuth } from '@/hooks/useAuth.ts'
 import { Logo } from '@/components/logo/logo'
+import type { RecordResponse } from '@/lib/api'
+
+function formatDate(dateString: string): string {
+  const date = new Date(dateString);
+  return date.toLocaleString('en-IL', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+    timeZone: 'Asia/Jerusalem'
+  });
+}
 
 export const Route = createFileRoute('/history/$item')({
   component: RouteComponent,
@@ -16,10 +31,10 @@ export const Route = createFileRoute('/history/$item')({
 
 function RouteComponent() {
   useAuth() // Add authentication check
-  const data = Route.useLoaderData()
+  const data: RecordResponse = Route.useLoaderData()
   const [error, setError] = useState<string | null>(null)
   
-  if (error || !data) {
+  if (error || !data || !data.record || data.record.length === 0) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-gray-900 to-gray-800">
         <div className="max-w-2xl mx-auto py-12 px-4 sm:px-6 lg:px-8">
@@ -32,6 +47,8 @@ function RouteComponent() {
     )
   }
 
+  const record = data.record[0] // Get the first record from the array
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-900 to-gray-800">
       <div className="max-w-2xl mx-auto py-12 px-4 sm:px-6 lg:px-8">
@@ -41,30 +58,26 @@ function RouteComponent() {
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <h2 className="text-2xl font-semibold text-gray-200">Recording Details</h2>
-              <div className={`px-3 py-1 rounded-full text-sm font-medium ${
-                data.processingStatus 
-                  ? 'bg-green-500/20 text-green-400' 
-                  : 'bg-red-500/20 text-red-400'
-              }`}>
-                {data.processingStatus ? 'Processing Successful' : 'Processing Failed'}
+              <div className="px-3 py-1 rounded-full text-sm font-medium bg-green-500/20 text-green-400">
+                Processing Successful
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-4 text-sm">
               <div className="space-y-1">
                 <p className="text-gray-400">Date</p>
-                <p className="text-gray-200">{data.date}</p>
+                <p className="text-gray-200">{formatDate(record[1])}</p>
               </div>
               <div className="space-y-1">
                 <p className="text-gray-400">Data Type</p>
-                <p className="text-gray-200">{data.dataType}</p>
+                <p className="text-gray-200">{record[2].split(':')[1]}</p>
               </div>
             </div>
 
             <div className="space-y-2">
               <p className="text-gray-400">Content</p>
               <div className="bg-gray-700 rounded-lg p-4">
-                <p className="text-gray-200">{data.content}</p>
+                <p className="text-gray-200">{record[2].split(':')[0]}</p>
               </div>
             </div>
           </div>
