@@ -16,3 +16,7 @@ export interface ImageData {
 }
 
 export type Record = [number, string, string]; // [id, timestamp, data]
+
+export interface RecordResponse {
+    record: Record[];
+}

@@ -2,6 +2,14 @@ import { Logo } from '@/components/logo/logo'
 import { createFileRoute } from '@tanstack/react-router'
 import { Link } from '@tanstack/react-router'
 import { useAuth } from '@/hooks/useAuth'
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+import { useState } from 'react'
 
 export const Route = createFileRoute('/dashboard/')({
   component: DashboardComponent,
@@ -9,20 +17,12 @@ export const Route = createFileRoute('/dashboard/')({
 
 function DashboardComponent() {
   useAuth() // This will handle the authentication check and redirect
+  const [showDialog, setShowDialog] = useState(false);
 
   const handleUploadVideo = () => {
-    // Implement file upload logic
-    const input = document.createElement('input')
-    input.type = 'file'
-    input.accept = 'video/*'
-    input.onchange = (e) => {
-      const file = (e.target as HTMLInputElement).files?.[0]
-      if (file) {
-        // Handle the video file
-        console.log('Video selected:', file)
-      }
-    }
-    input.click()
+    setShowDialog(true);
+    // Hide the dialog after 3 seconds
+    setTimeout(() => setShowDialog(false), 1000);
   }
 
   return (
@@ -30,6 +30,18 @@ function DashboardComponent() {
       <div className="max-w-4xl mx-auto py-12 px-4 sm:px-6 lg:px-8">
         {/* Logo */}
         <Logo className='mb-12'/>
+
+        {/* Alert Dialog */}
+        <AlertDialog open={showDialog} onOpenChange={setShowDialog}>
+          <AlertDialogContent className="bg-gray-800 border border-gray-700">
+            <AlertDialogHeader>
+              <AlertDialogTitle className="text-gray-200">Coming Soon!</AlertDialogTitle>
+              <AlertDialogDescription className="text-gray-400">
+                Video upload feature will be available in a future update.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+          </AlertDialogContent>
+        </AlertDialog>
 
         {/* Main Actions */}
         <div className="grid gap-6 md:grid-cols-3 mb-12">

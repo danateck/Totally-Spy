@@ -166,7 +166,6 @@ def insert_scan(username: str, detected_text: str) -> None:
                     return None  # Return None if user is not found
                 
                 encrypted_text = encrypt_data(user_id, detected_text)
-                encrypted_text = detected_text
                 if encrypted_text is None:
                     logger.warning("Encryption failed!")
                     return
@@ -199,7 +198,8 @@ def encrypt_data(user_id: int, plaintext: str) -> Optional[str]:
                     # Use the decrypted key to encrypt the plaintext
                     cipher = Fernet(decrypted_key)
                     encrypted_text = cipher.encrypt(plaintext.encode('utf-8'))
-                    return encrypted_text
+                    # Convert encrypted bytes to hex string for storage in TEXT field
+                    return encrypted_text.hex()
         except Exception as e:
             logger.error(f"Encryption Error: {e}")
         finally:
@@ -222,11 +222,16 @@ def decrypt_data(user_id, encrypted_text):
                     decrypted_key = decrypt_user_key(key_bytes)
 
                     cipher = Fernet(decrypted_key)
-                    # Convert the hex string to bytes
-                    encrypted_text_cleaned = encrypted_text.replace('\\x', '')
-                    encrypted_text_bytes = binascii.unhexlify(encrypted_text_cleaned)
-                    decrypted_text = cipher.decrypt(encrypted_text_bytes).decode('utf-8')
-                    return decrypted_text
+                    
+                    # Convert hex string back to bytes - no need for cleaning or replacing
+                    try:
+                        encrypted_text_bytes = binascii.unhexlify(encrypted_text)
+                        decrypted_text = cipher.decrypt(encrypted_text_bytes).decode('utf-8')
+                        return decrypted_text
+                    except Exception as e:
+                        logger.error(f"Error decrypting text: {e}")
+                        logger.error(f"Encrypted text: {encrypted_text}")
+                        return f"Decryption failed: {str(e)}"
                 else:
                     logger.warning("No encryption key found for the user!")
         except Exception as e:
@@ -267,7 +272,7 @@ def get_scan_history_by_id(user_id: int, record_id: int) -> list[tuple[int, str,
             with conn.cursor() as cur:
                 cur.execute("SELECT id, scan_time, detected_text FROM scan_history WHERE id = %s;", (record_id,))
                 scan = cur.fetchone()
-                decrypted_scan = [(scan[0], scan[1], scan[2])]
+                decrypted_scan = [(scan[0], scan[1], decrypt_data(user_id, scan[2]))]
                 return decrypted_scan
         except Exception as e:
             logger.error(f"Error fetching scan history: {e}")

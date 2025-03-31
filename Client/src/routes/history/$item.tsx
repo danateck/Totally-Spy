@@ -2,7 +2,7 @@ import { createFileRoute, Link } from '@tanstack/react-router'
 import { useEffect, useState } from 'react'
 import { useAuth } from '@/hooks/useAuth.ts'
 import { Logo } from '@/components/logo/logo'
-import type { RecordResponse } from '@/lib/api'
+import type { Record, RecordResponse } from '@/lib/api'
 
 function formatDate(dateString: string): string {
   const date = new Date(dateString);
@@ -16,6 +16,26 @@ function formatDate(dateString: string): string {
     hour12: false,
     timeZone: 'Asia/Jerusalem'
   });
+}
+
+// Extract first row of data, splitting by newline
+function getFirstRow(data: string): { value: string, type: string } {
+  // Get only first line if multiple lines exist
+  const firstLine = data.split('\n')[0];
+  // Split by colon
+  const parts = firstLine.split(':');
+  
+  if (parts.length >= 2) {
+    return {
+      value: parts[0],
+      type: parts[1]
+    };
+  }
+  
+  return {
+    value: firstLine,
+    type: 'Unknown'
+  };
 }
 
 export const Route = createFileRoute('/history/$item')({
@@ -47,7 +67,8 @@ function RouteComponent() {
     )
   }
 
-  const record = data.record[0] // Get the first record from the array
+  const record = data.record[0]; // Get the first record from the array
+  const { value, type } = getFirstRow(record[2]); // Extract first row data
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-900 to-gray-800">
@@ -70,14 +91,14 @@ function RouteComponent() {
               </div>
               <div className="space-y-1">
                 <p className="text-gray-400">Data Type</p>
-                <p className="text-gray-200">{record[2].split(':')[1]}</p>
+                <p className="text-gray-200">{type}</p>
               </div>
             </div>
 
             <div className="space-y-2">
               <p className="text-gray-400">Content</p>
               <div className="bg-gray-700 rounded-lg p-4">
-                <p className="text-gray-200">{record[2].split(':')[0]}</p>
+                <p className="text-gray-200">{value}</p>
               </div>
             </div>
           </div>
