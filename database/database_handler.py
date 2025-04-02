@@ -22,26 +22,31 @@ DB_CONFIG = {
 
 logger = logging.getLogger(__name__)  # Create a logger for notifications
 
+
 # Connect to PostgreSQL
 def get_db_connection():
     try:
         return psycopg2.connect(**DB_CONFIG)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Database connection failed: {str(e)}")
-    
-#MASTER_KEY encrypts each user_key that is stored in db  
+
+
+# MASTER_KEY encrypts each user_key that is stored in db
 MASTER_KEY = os.getenv("MASTER_KEY")
 if not MASTER_KEY:
     raise HTTPException(status_code=500, detail="Master key is not set in environment variables")
 
-#user key is used to encrypt the scan results
+
+# user key is used to encrypt the scan results
 def encrypt_user_key(user_key: bytes) -> bytes:
     cipher = Fernet(MASTER_KEY)
     return cipher.encrypt(user_key)
 
+
 def decrypt_user_key(encrypted_key: bytes) -> bytes:
     cipher = Fernet(MASTER_KEY)
     return cipher.decrypt(encrypted_key)
+
 
 # Function to create the users table -- exists
 def create_users_table():
@@ -63,6 +68,7 @@ def create_users_table():
             logger.error(f"Error creating table: {e}")
         finally:
             conn.close()
+
 
 # Function to create the scan_history table -- exists
 def create_scan_history_table():
@@ -94,7 +100,7 @@ def login_user(username: str, password: str) -> bool:
                 # Retrieve the hashed password for the user from the database
                 cur.execute("SELECT password FROM users WHERE username = %s;", (username,))
                 result = cur.fetchone()
-                
+
                 if result:
                     stored_hashed_password = result[0]
                     # Check if the provided password matches the stored hash
@@ -109,13 +115,14 @@ def login_user(username: str, password: str) -> bool:
         finally:
             conn.close()
 
+
 # Function to insert a new user into the database
 def insert_user(username: str, password: str) -> int | None:
     conn = get_db_connection()
     if conn:
         try:
             hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
-            user_key = Fernet.generate_key()  #personal user key
+            user_key = Fernet.generate_key()  # personal user key
             encrypted_user_key = encrypt_user_key(user_key)  # encrypt user key with MASTER_KEY
             with conn.cursor() as cur:
                 cur.execute(
@@ -134,10 +141,11 @@ def insert_user(username: str, password: str) -> int | None:
         finally:
             conn.close()
 
+
 def insert_scan(username: str, detected_text: str) -> None:
     conn = get_db_connection()
     if conn:
-        try: 
+        try:
             # Get the user_id based on the username
             with conn.cursor() as cur:
                 cur.execute("SELECT id FROM users WHERE username = %s;", (username,))
@@ -146,13 +154,13 @@ def insert_scan(username: str, detected_text: str) -> None:
                 if user_id_row is None:
                     logger.warning(f"No user found with username: {username}")
                     return None  # Return None if user is not found
-                
+
                 user_id = user_id_row[0]
                 encrypted_text = encrypt_data(user_id, detected_text)
                 if encrypted_text is None:
                     logger.warning("Encryption failed!")
                     return
-                
+
                 cur.execute(
                     "INSERT INTO scan_history (user_id, detected_text) VALUES (%s, %s);",
                     (user_id, encrypted_text)
@@ -165,7 +173,6 @@ def insert_scan(username: str, detected_text: str) -> None:
             conn.close()
 
 
-
 def encrypt_data(user_id: int, plaintext: str) -> Optional[str]:
     conn = get_db_connection()
     if conn:
@@ -174,10 +181,10 @@ def encrypt_data(user_id: int, plaintext: str) -> Optional[str]:
                 # Fetch the encrypted encryption_key from the database
                 cur.execute("SELECT encryption_key FROM users WHERE id = %s;", (user_id,))
                 encrypted_key = cur.fetchone()
-                encrypted_key_bytes= bytes(encrypted_key[0])
+                encrypted_key_bytes = bytes(encrypted_key[0])
                 if encrypted_key:
                     # Decrypt the encryption key using the MASTER_KEY
-                    decrypted_key= decrypt_user_key(encrypted_key_bytes)
+                    decrypted_key = decrypt_user_key(encrypted_key_bytes)
                     # Use the decrypted key to encrypt the plaintext
                     cipher = Fernet(decrypted_key)
                     encrypted_text = cipher.encrypt(plaintext.encode('utf-8'))
@@ -188,7 +195,7 @@ def encrypt_data(user_id: int, plaintext: str) -> Optional[str]:
             conn.close()
     return None
 
-        
+
 def decrypt_data(user_id, encrypted_text):
     conn = get_db_connection()
     if conn:
@@ -240,4 +247,3 @@ def get_scan_history(username: str) -> list[tuple[int, str, str]]:
         finally:
             conn.close()
     return []
-

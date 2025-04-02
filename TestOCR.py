@@ -4,7 +4,7 @@ import unittest
 
 import cv2
 
-from OCRManager import OCRManager
+from OCR.OCRManager import OCRManager
 
 class TestPaddleOCR(unittest.TestCase):
 
@@ -27,7 +27,7 @@ class TestPaddleOCR(unittest.TestCase):
 
     def test_images(self):
         ocr_manager = OCRManager()
-        image_dir = "./test_images"
+        image_dir = "OCR/test_images"
         self.assertTrue(os.path.isdir(image_dir), f"Directory {image_dir} does not exist")
 
         for filename in os.listdir(image_dir):
@@ -44,7 +44,7 @@ class TestPaddleOCR(unittest.TestCase):
     def test_speed(self):
         ocr_manager = OCRManager()
         filename = "basic_test_case.png"
-        image_test = "./test_images/" + filename
+        image_test = "./OCR/test_images/" + filename
         self.assertTrue(os.path.isfile(image_test), f"file {image_test} does not exist")
         img = cv2.imread(image_test)
         time_now = time.time()

@@ -21,4 +21,3 @@ def classify_text(text: str)-> list[tuple[str, str]]:
             detected.append((match, label))
     return detected # results have data, data_type
 
-
