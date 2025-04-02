@@ -10,7 +10,7 @@
             "request": "launch",
             "module": "uvicorn",
             "args": [
-                "server:app", // Changed to specify the FastAPI app instance
+                "server:app",
                 "--port",
                 "4000",
                 "--host",
