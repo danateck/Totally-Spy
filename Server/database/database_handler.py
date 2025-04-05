@@ -11,7 +11,7 @@ from typing import Optional
 from pydantic import BaseModel
 
 # Load environment variables from .env file
-load_dotenv()
+load_dotenv("./env/.env")
 
 # PostgreSQL connection details
 DB_CONFIG = {

@@ -13,7 +13,7 @@ function RouteComponent() {
   useEffect(() => {
     async function fetchRecordings() {
       try {
-        const response = await fetch('http://localhost:4000/history/recordings',{credentials: 'include'})
+        const response = await fetch('/history/recordings',{credentials: 'include'})
 
         // Check if the response is not okay (i.e., status code not in 2xx range)
         if (!response.ok) {

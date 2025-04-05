@@ -7,7 +7,7 @@ from PIL import Image
 from fastapi import Depends, FastAPI, Cookie, Response, Request, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+from fastapi.responses import HTMLResponse, FileResponse
 from pydantic import BaseModel
 
 from Data_recognition.data_type_recognition import classify_text
@@ -18,7 +18,7 @@ from YOLO8.detect_phone import DetectPhone, get_phones_from_cords, find_largest_
 app = FastAPI()
 ocr_manager = OCRManager()
 detector = DetectPhone('./YOLO8/best.pt')
-client_path = "../Client/"
+client_path = "../Client/dist/"
 
 # Allow frontend running on port 3000 to communicate with backend
 app.add_middleware(
@@ -72,12 +72,7 @@ def decode_base64_frame(base64_frame):
     return np.array(img)
 
 # Mount the static files directory
-app.mount("/assets", StaticFiles(directory=client_path + "dist/assets"), name="assets")
-app.mount("/", StaticFiles(directory=client_path + "public"), name="public")
-
-@app.get("/")
-async def read_root():
-    return FileResponse(client_path + 'dist/index.html')
+app.mount("/static", StaticFiles(directory=client_path), name="public")
 
 @app.post("/record/img")
 async def search_info(image_data: ImageData, user: User = Depends(get_current_user)):
@@ -156,3 +151,12 @@ async def get_record(record_id: int, user: User = Depends(get_current_user)):
     record = get_scan_history_by_id(user.id, record_id)
     return {"record": record}
 
+@app.get("/", response_class=FileResponse)
+async def serve_index():
+    # Serve React's index.html for any unknown route
+    return FileResponse(client_path + "index.html")
+
+@app.get("/{full_path:path}", response_class=FileResponse)
+async def serve_spa(full_path: str):
+    # Serve React's index.html for any unknown route
+    return FileResponse(client_path + "index.html")
