@@ -4,7 +4,7 @@ from google.cloud import vision
 from numpy import ndarray
 
 type Cords = tuple[int, int] #tuple[x,y]
-type TextRecognition =  list[dict[str,Cords]] #list[word,cords]
+type TextRecognition = list[dict[str,Cords]] #list[word,cords]
 
 class OCR:
     def __init__(self, client):
