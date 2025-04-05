@@ -77,7 +77,7 @@ function RouteComponent() {
                   </div>
                   <div>
                     <h3 className="text-lg font-medium text-gray-200 group-hover:text-white transition-colors">
-                      {recording.date} Recording
+                      {recording[1]} Recording
                     </h3>
                     <p className="text-sm text-gray-400">Click to view details</p>
                   </div>

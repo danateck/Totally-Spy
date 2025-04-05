@@ -9,7 +9,6 @@
 #ignore idea files
 .venv/
 .idea/
-.vite/
 __pycache__/
 .env
 env/
