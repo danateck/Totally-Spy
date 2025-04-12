@@ -12,7 +12,7 @@ export default defineConfig({
     allowedHosts: [
       'fun-present-tetra.ngrok-free.app',
       '.ngrok-free.app', // This will allow all ngrok-free.app subdomains
-      'localhost:4001'
+      'localhost:4000'
     ],
     cors: true,
   },

@@ -25,7 +25,7 @@ client_path = "../Client/dist/"
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],  # Frontend URL
+    allow_origins=["http://localhost:5173", "http://localhost:3000", "https://totallyspy.xyz"],  # Frontend URL
     allow_credentials=True,
     allow_methods=["*"],  # Allows all methods like GET, POST, etc.
     allow_headers=["*"],  # Allows all headers
@@ -87,7 +87,7 @@ async def search_info(image_data: ImageData, user: User = Depends(get_current_us
         if len(cropped_image) > 0:
             cropped_image = cropped_image[0]
         else:
-            raise HTTPException(status_code=404, detail="No phone found.")
+            raise HTTPException(status_code=201, detail="No phone found.")
         enhanced_image = enhance_image(cropped_image)
         extracted_text = ocr_manager.extract_text(enhanced_image)
         detected_data = classify_text(extracted_text[0])
@@ -97,7 +97,7 @@ async def search_info(image_data: ImageData, user: User = Depends(get_current_us
         if detected_data:
             return {"message": detected_data}
         else:
-            raise HTTPException(status_code=404, detail="No data found.")
+            raise HTTPException(status_code=202, detail="No data found.")
 
 
 @app.post("/auth/login")
