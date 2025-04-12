@@ -1,3 +1,7 @@
+
+
+
+
 import { Logo } from '@/components/logo/logo'
 import { createFileRoute } from '@tanstack/react-router'
 import { Link } from '@tanstack/react-router'
@@ -131,3 +135,9 @@ function DashboardComponent() {
     </div>
   )
 }
+
+
+
+
+
+

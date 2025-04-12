@@ -1,3 +1,11 @@
+
+
+
+
+
+
+
+
 @import "tailwindcss";
 @import "tw-animate-css";
 
@@ -94,3 +102,5 @@ code {
     @apply bg-background text-foreground;
   }
 }
+
+

@@ -1,3 +1,10 @@
+
+
+
+
+
+
+
 import { createFileRoute } from '@tanstack/react-router'
 import { useState } from 'react'
 import { Link } from '@tanstack/react-router'
@@ -29,7 +36,7 @@ function RouteComponent() {
 
   const handleCapture = async (imageSrc: string) => {
     try {
-      const response = await fetch('http://localhost:4000/record/img', {
+      const response = await fetch('/record/img', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -130,3 +137,15 @@ function RouteComponent() {
     </div>
   )
 }
+
+
+
+
+
+
+
+
+
+
+
+

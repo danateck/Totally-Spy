@@ -1,3 +1,7 @@
+
+
+
+
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { useEffect, useState } from 'react'
 import { useAuth } from '@/hooks/useAuth.ts'
@@ -39,7 +43,7 @@ function getFirstRow(data: string): { value: string, type: string } {
 export const Route = createFileRoute('/history/$item')({
   component: RouteComponent,
   loader: async ({ params }) => {
-    const response = await fetch(`http://localhost:4000/history/record/${params.item}`,{credentials: 'include',})
+    const response = await fetch(`/history/record/${params.item}`,{credentials: 'include',})
     if (!response.ok) {
       throw new Error(`Error: ${response.status} - ${response.statusText}`)
     }
@@ -120,3 +124,22 @@ function RouteComponent() {
     </div>
   )
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
