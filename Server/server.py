@@ -1,6 +1,8 @@
 import base64
 import uuid
 from io import BytesIO
+import os
+from pathlib import Path
 
 import numpy as np
 from PIL import Image
@@ -157,5 +159,14 @@ async def serve_index():
 
 @app.get("/{full_path:path}", response_class=FileResponse)
 async def serve_spa(full_path: str):
-    # Serve React's index.html for any unknown route
-    return FileResponse(client_path + "index.html")
+    # Remove any leading slashes and normalize the path
+    normalized_path = full_path.lstrip('/')
+    
+    # Construct the full file path within the client directory
+    file_path = os.path.join(client_path, normalized_path)
+    
+    # Check if the file exists and is within the client directory
+    if os.path.exists(file_path) and os.path.commonpath([os.path.abspath(file_path), os.path.abspath(client_path)]) == os.path.abspath(client_path):
+        return FileResponse(file_path)
+    else:
+        return FileResponse(client_path + "index.html")
