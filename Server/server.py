@@ -157,6 +157,59 @@ async def serve_index():
     # Serve React's index.html for any unknown route
     return FileResponse(client_path + "index.html")
 
+@app.post("/api/user/delete")
+async def delete_current_user(user: User = Depends(get_current_user)):
+    try:
+        # Remove user session first (optional cleanup)
+        delete_sessions_for_user(user.id)
+        
+        # Remove user from database
+        delete_user(user.username)
+        
+        return {"message": "User deleted successfully"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="Failed to delete user")
+    
+@app.get("/api/user/profile")
+async def get_user_profile(user: User = Depends(get_current_user)):
+    try:
+        # Use user.id instead of username
+        scan_count = get_scan_count_for_user(user.id)
+        
+        # Create user data object
+        user_data = {
+            "username": user.username,
+            # You might not have these fields, customize as needed
+            "joinDate": user.created_at if hasattr(user, 'created_at') else None,
+            "totalRecordings": scan_count,
+            "lastActive": "Today"  # Or implement a way to track last activity
+        }
+        
+        return {"user": user_data}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch user profile: {str(e)}")
+
+@app.post("/history/delete")
+async def delete_history_record(request: Request, user: User = Depends(get_current_user)):
+    try:
+        data = await request.json()
+        record_id = data.get("recordId")
+        action = data.get("action")
+        
+        if not record_id or action != "delete":
+            raise HTTPException(status_code=400, detail="Invalid request")
+        
+        # Call the database function to delete the record
+        success = delete_record(record_id)
+        
+        if not success:
+            raise HTTPException(status_code=404, detail="Record not found or already deleted")
+            
+        return {"message": "Record deleted successfully"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to delete record: {str(e)}")
+    
+
 @app.get("/{full_path:path}", response_class=FileResponse)
 async def serve_spa(full_path: str):
     # Remove any leading slashes and normalize the path
@@ -170,3 +223,6 @@ async def serve_spa(full_path: str):
         return FileResponse(file_path)
     else:
         return FileResponse(client_path + "index.html")
+    
+
+

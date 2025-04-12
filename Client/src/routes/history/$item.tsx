@@ -48,43 +48,108 @@ export const Route = createFileRoute('/history/$item')({
   },  
 })
 
+// Custom confirmation modal component
+function ConfirmationModal({ 
+  isOpen, 
+  onClose, 
+  onConfirm, 
+  isDeleting 
+}: { 
+  isOpen: boolean, 
+  onClose: () => void, 
+  onConfirm: () => void, 
+  isDeleting: boolean 
+}) {
+  if (!isOpen) return null;
+  
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+      <div className="bg-card rounded-xl p-6 max-w-md w-11/12 shadow-xl">
+        <h3 className="text-xl font-bold mb-4">Confirm Deletion</h3>
+        <p className="mb-6">
+          Are you sure you want to delete this record? This action cannot be undone.
+        </p>
+        <div className="flex justify-end space-x-3">
+          <Button
+            onClick={onClose}
+            variant="outline"
+            disabled={isDeleting}
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={onConfirm}
+            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            disabled={isDeleting}
+          >
+            {isDeleting ? 'Deleting...' : 'Delete'}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function RouteComponent() {
   useAuth() // Add authentication check
   const router = useRouter()
   const data: RecordResponse = Route.useLoaderData()
   const [error, setError] = useState<string | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
+  const [showModal, setShowModal] = useState(false)
   const params = Route.useParams()
   
-  async function handleDelete() {
-    if (window.confirm('Are you sure you want to delete this record? This action cannot be undone.')) {
-      setIsDeleting(true)
-      try {
-        // Using POST instead of DELETE with a specific action parameter
-        const response = await fetch(`/history/delete`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          credentials: 'include',
-          body: JSON.stringify({ 
-            recordId: params.item,
-            action: 'delete'
-          })
+  // Handle modal open
+  const handleDeleteClick = () => {
+    setShowModal(true);
+  };
+  
+  // Handle modal close
+  const handleModalClose = () => {
+    setShowModal(false);
+  };
+  
+  // Handle delete confirmation
+  const handleConfirmDelete = async () => {
+    setIsDeleting(true);
+    try {
+      // Using POST instead of DELETE with a specific action parameter
+      const response = await fetch(`/history/delete`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({ 
+          recordId: params.item,
+          action: 'delete'
         })
-        
-        if (!response.ok) {
-          throw new Error(`Failed to delete: ${response.status} - ${response.statusText}`)
-        }
-        
-        // Redirect to history page after successful deletion
-        router.navigate({ to: '/history' })
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to delete record')
-        setIsDeleting(false)
+      })
+      
+      if (!response.ok) {
+        throw new Error(`Failed to delete: ${response.status} - ${response.statusText}`)
       }
+      
+      // Redirect to history page after successful deletion
+      router.navigate({ to: '/history' })
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to delete record')
+      setIsDeleting(false)
+      setShowModal(false)
     }
-  }
+  };
+  
+  // Handle escape key to close modal
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && showModal) {
+        handleModalClose();
+      }
+    };
+    
+    window.addEventListener('keydown', handleEscape);
+    return () => window.removeEventListener('keydown', handleEscape);
+  }, [showModal]);
   
   if (error || !data || !data.record || data.record.length === 0) {
     return (
@@ -147,7 +212,7 @@ function RouteComponent() {
             
             <div className="pt-4 border-t border-border">
               <Button
-                onClick={handleDelete}
+                onClick={handleDeleteClick}
                 disabled={isDeleting}
                 className="w-full bg-destructive text-destructive-foreground hover:bg-destructive/90"
               >
@@ -172,6 +237,14 @@ function RouteComponent() {
           </Link>
         </div>
       </div>
+      
+      {/* Confirmation Modal */}
+      <ConfirmationModal 
+        isOpen={showModal}
+        onClose={handleModalClose}
+        onConfirm={handleConfirmDelete}
+        isDeleting={isDeleting}
+      />
     </div>
   )
 }

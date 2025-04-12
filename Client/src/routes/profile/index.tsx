@@ -14,7 +14,6 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 
-// Update the route path to match your actual file location
 export const Route = createFileRoute('/profile/')({
   component: ProfileComponent,
 })
@@ -27,7 +26,6 @@ type User = {
 }
 
 function ProfileComponent() {
-  // Get the authentication context
   const auth = useAuth()
   const router = useRouter()
   const [userData, setUserData] = useState<User | null>(null)
@@ -36,27 +34,36 @@ function ProfileComponent() {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
   
-  // Get username from localStorage or another source if useAuth doesn't provide user
+  // Get username from localStorage
   const username = localStorage.getItem('username') || 'User'
 
   useEffect(() => {
     async function fetchUserData() {
       try {
         setIsLoading(true)
-        // You would need an endpoint to get user details
         const response = await fetch('/api/user/profile', {
           credentials: 'include',
         })
 
         if (!response.ok) {
-          throw new Error(`Error: ${response.status} - ${response.statusText}`)
+          const errorText = await response.text();
+          console.error("Profile fetch error:", response.status, errorText);
+          throw new Error(`Error ${response.status}: ${errorText || response.statusText}`);
         }
 
         const data = await response.json()
-        setUserData(data.user)
+        console.log("Profile data:", data);  // Add logging to debug
+        
+        if (data && data.user) {
+          setUserData(data.user)
+        } else {
+          // Fallback if API returns success but empty data
+          setUserData({ username })
+        }
       } catch (err) {
+        console.error("Profile error:", err);
         setError(err instanceof Error ? err.message : 'Failed to load profile')
-        // Fallback to basic user data if API fails
+        // Ensure we have some basic data to display
         setUserData({ username })
       } finally {
         setIsLoading(false)
@@ -69,7 +76,6 @@ function ProfileComponent() {
   const handleDeleteAccount = async () => {
     setIsDeleting(true)
     try {
-      // Send request to delete account
       const response = await fetch('/api/user/delete', {
         method: 'POST',
         credentials: 'include',
@@ -77,12 +83,15 @@ function ProfileComponent() {
           'Content-Type': 'application/json',
         },
       })
-
+  
       if (!response.ok) {
         throw new Error(`Failed to delete account: ${response.status}`)
       }
-
-      // Log out the user after successful deletion
+  
+      // Clear localStorage
+      localStorage.removeItem('username')
+      
+      // Log out the user
       await auth.logout()
       
       // Redirect to signup page
@@ -97,7 +106,7 @@ function ProfileComponent() {
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background flex justify-center items-center"
-      style={{ backgroundImage: "url('/images/background.jpg')" }}>
+        style={{ backgroundImage: "url('/images/background.jpg')" }}>
         <div className="text-primary">Loading profile...</div>
       </div>
     )
@@ -105,54 +114,48 @@ function ProfileComponent() {
 
   return (
     <div className="min-h-screen bg-background text-foreground"
-    style={{ backgroundImage: "url('/images/background.jpg')" }}>
+      style={{ backgroundImage: "url('/images/background.jpg')" }}>
       <div className="max-w-2xl mx-auto py-12 px-4 sm:px-6 lg:px-8">
         <Logo className="mb-12" />
-        
+
         <div className="bg-card rounded-xl shadow-2xl p-8 space-y-6 border border-border">
           <div className="flex items-center justify-between">
             <h2 className="text-2xl font-semibold text-primary">User Profile</h2>
           </div>
-          
+
           {error && (
             <div className="bg-destructive/20 p-4 rounded-lg text-destructive">
               {error}
             </div>
           )}
-          
-          {userData && (
+
+          {userData ? (
             <div className="space-y-6">
               <div className="flex items-center space-x-4">
                 <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center">
                   <span className="text-2xl font-bold text-primary">
-                    {userData.username?.charAt(0).toUpperCase()}
+                    {userData.username?.charAt(0).toUpperCase() || '?'}
                   </span>
                 </div>
                 <div>
-                  <h3 className="text-xl font-semibold">{userData.username}</h3>
-                  {userData.joinDate && (
-                    <p className="text-muted-foreground">
-                      Member since {new Date(userData.joinDate).toLocaleDateString()}
-                    </p>
-                  )}
+                  <h3 className="text-xl font-semibold">{userData.username || username}</h3>
+                  <p className="text-muted-foreground">
+                    Welcome back!
+                  </p>
                 </div>
               </div>
-              
+
               <div className="grid grid-cols-2 gap-4 p-4 bg-muted rounded-lg">
                 <div className="text-center">
-                  <p className="text-lg font-medium">{userData.totalRecordings || 0}</p>
+                  <p className="text-lg font-medium">{userData.totalRecordings ?? 0}</p>
                   <p className="text-muted-foreground">Total Recordings</p>
                 </div>
                 <div className="text-center">
-                  <p className="text-lg font-medium">
-                    {userData.lastActive 
-                      ? new Date(userData.lastActive).toLocaleDateString() 
-                      : 'Today'}
-                  </p>
-                  <p className="text-muted-foreground">Last Active</p>
+                  <p className="text-lg font-medium">Active</p>
+                  <p className="text-muted-foreground">Status</p>
                 </div>
               </div>
-              
+
               <div className="pt-4 border-t border-border space-y-4">
                 <Button
                   onClick={() => setShowDeleteDialog(true)}
@@ -163,9 +166,14 @@ function ProfileComponent() {
                 </Button>
               </div>
             </div>
+          ) : (
+            <div className="text-center text-muted-foreground py-8">
+              <p>No user data found.</p>
+              <p className="mt-2">Username from localStorage: {username}</p>
+            </div>
           )}
         </div>
-        
+
         <div className="fixed bottom-8 left-0 right-0 flex justify-center space-x-4">
           <Link
             to="/dashboard"
@@ -174,7 +182,7 @@ function ProfileComponent() {
             <span className="mr-2">←</span> Back to Dashboard
           </Link>
         </div>
-        
+
         {/* Delete Account Confirmation Dialog */}
         <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
           <AlertDialogContent className="bg-card border border-border">
