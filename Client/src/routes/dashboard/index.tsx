@@ -44,6 +44,16 @@ function DashboardComponent() {
         </button>
       </div>
 
+      {/* Profile Button in top-right corner */}
+      <div className="absolute top-4 right-4">
+        <Link
+          to="/profile"
+          className="text-sm text-white bg-card px-4 py-2 rounded-md shadow hover:bg-accent transition-all border border-border"
+        >
+          My Profile
+        </Link>
+      </div>
+
       <div className="max-w-4xl mx-auto py-12 px-4 sm:px-6 lg:px-8">
         <Logo className="mb-12" />
 

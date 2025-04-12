@@ -21,7 +21,7 @@ function SignupPage() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
 
-  // ✅ Force dark mode globally
+  //  Force dark mode globally
   useEffect(() => {
     document.documentElement.classList.add('dark')
   }, [])
@@ -36,7 +36,7 @@ function SignupPage() {
       })
 
       if (!response.ok) {
-        throw new Error('Signup failed')
+        throw new Error('Username already exists')
       }
 
       router.navigate({ to: '/dashboard' })
