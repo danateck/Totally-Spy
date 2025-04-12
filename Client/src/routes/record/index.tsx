@@ -5,7 +5,6 @@ import { Logo } from '@/components/logo/logo'
 import WebcamCapture from '@/components/webcam/webcam'
 import type { ApiResponseFoundCode } from '@/lib/api'
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { SERVER_URL } from '@/config'
 
 export const Route = createFileRoute('/record/')({
   component: RouteComponent,
@@ -30,7 +29,7 @@ function RouteComponent() {
 
   const handleCapture = async (imageSrc: string) => {
     try {
-      const response = await fetch(`${SERVER_URL}/record/img`, {
+      const response = await fetch('/record/img', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

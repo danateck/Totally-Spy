@@ -1,6 +1,5 @@
 import base64
 import uuid
-import os
 from io import BytesIO
 
 import numpy as np
@@ -22,18 +21,13 @@ ocr_manager = OCRManager()
 detector = DetectPhone('./YOLO8/best.pt')
 client_path = "../Client/dist/"
 
-# Get client URL from environment variable or use default
-CLIENT_URL = os.getenv('CLIENT_URL', 'http://localhost:5173')
-
-# Allow frontend to communicate with backend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[CLIENT_URL],  # Frontend URL from environment
+    allow_origins=["http://localhost:5173"],  # Frontend URL
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["*"],  # Allows all methods like GET, POST, etc.
+    allow_headers=["*"],  # Allows all headers
 )
-
 # On server start, ensure the user table is created
 create_users_table()
 create_scan_history_table()
