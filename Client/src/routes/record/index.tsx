@@ -1,10 +1,3 @@
-
-
-
-
-
-
-
 import { createFileRoute } from '@tanstack/react-router'
 import { useState } from 'react'
 import { Link } from '@tanstack/react-router'
@@ -36,7 +29,7 @@ function RouteComponent() {
 
   const handleCapture = async (imageSrc: string) => {
     try {
-      const response = await fetch('/record/img', {
+      const response = await fetch('http://localhost:4000/record/img', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -59,7 +52,8 @@ function RouteComponent() {
   }
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div className="min-h-screen bg-background text-foreground"
+    style={{ backgroundImage: "url('/images/background.jpg')" }}>
       <div className="container mx-auto px-4 py-8">
         <Logo />
 
@@ -137,15 +131,3 @@ function RouteComponent() {
     </div>
   )
 }
-
-
-
-
-
-
-
-
-
-
-
-
