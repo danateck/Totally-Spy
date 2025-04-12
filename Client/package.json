@@ -2,6 +2,7 @@
   "name": "totallyspy",
   "private": true,
   "type": "module",
+  "homepage": "/static",
   "scripts": {
     "start": "vite --port 3000",
     "build": "vite build && tsc",

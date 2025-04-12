@@ -20,7 +20,8 @@
             "cwd": "${workspaceFolder}/Server",
             "jinja": true,
             "env": {
-                "DEVELOPMENT": "True"
+                "DEVELOPMENT": "True",
+                "CLIENT_URL": "http://localhost:5173"
             },
             "console": "integratedTerminal"
         }

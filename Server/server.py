@@ -1,5 +1,6 @@
 import base64
 import uuid
+import os
 from io import BytesIO
 
 import numpy as np
@@ -15,18 +16,22 @@ from Enhance_Image.pictureChange import enhance_image
 from OCR.OCRManager import OCRManager
 from database.database_handler import *
 from YOLO8.detect_phone import DetectPhone, get_phones_from_cords, find_largest_phone_from_cords
+
 app = FastAPI()
 ocr_manager = OCRManager()
 detector = DetectPhone('./YOLO8/best.pt')
 client_path = "../Client/dist/"
 
-# Allow frontend running on port 3000 to communicate with backend
+# Get client URL from environment variable or use default
+CLIENT_URL = os.getenv('CLIENT_URL', 'http://localhost:5173')
+
+# Allow frontend to communicate with backend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],  # Frontend URL
+    allow_origins=[CLIENT_URL],  # Frontend URL from environment
     allow_credentials=True,
-    allow_methods=["*"],  # Allows all methods like GET, POST, etc.
-    allow_headers=["*"],  # Allows all headers
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 # On server start, ensure the user table is created
