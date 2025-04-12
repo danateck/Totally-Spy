@@ -12,9 +12,9 @@
             "args": [
                 "server:app",
                 "--port",
-                "4000",
+                "4001",
                 "--host",
-                "0.0.0.0",
+                "localhost",
                 "--reload"
             ],
             "cwd": "${workspaceFolder}/Server",
