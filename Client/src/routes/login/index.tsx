@@ -17,7 +17,6 @@ function LoginPage() {
   const [error, setError] = useState('')
 
   async function handleLogin() {
-    //TODO login
     try {
       await login(username, password) // Add await here
       router.navigate({ to: '/dashboard' })
@@ -31,38 +30,38 @@ function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-gray-900 to-gray-800 flex justify-center items-center">
-      <div className="max-w-lg w-full space-y-6 p-8 bg-gray-800 rounded-xl shadow-2xl">
-        <Logo />
-        <p className="text-center text-gray-300">Please login to continue</p>
-        {error && <p className="text-center text-red-500">{error}</p>}
+    <div className="min-h-screen bg-background flex justify-center items-center text-foreground">
+      <div className="max-w-lg w-full space-y-6 p-8 bg-card rounded-xl shadow-2xl border border-border">
+        <Logo className="mb-8" />
+        <p className="text-center text-foreground">Please login to continue</p>
+        {error && <p className="text-center text-destructive">{error}</p>}
         <div className="space-y-4">
           <Input
             type="text"
             placeholder="Username"
             value={username}
             onChange={(e) => setUsername(e.target.value)}
-            className="bg-gray-700 border-gray-600 text-white placeholder-gray-400"
+            className="bg-muted border-border text-foreground placeholder-muted-foreground"
           />
           <Input
             type="password"
             placeholder="Password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="bg-gray-700 border-gray-600 text-white placeholder-gray-400"
+            className="bg-muted border-border text-foreground placeholder-muted-foreground"
           />
         </div>
         <div className="flex justify-center">
           <Button
             onClick={handleLogin}
-            className="bg-blue-500 hover:bg-blue-600 text-white px-8 py-2 rounded-lg font-semibold transition-all duration-200"
+            className="bg-primary text-primary-foreground py-2 px-8 rounded-lg font-semibold hover:bg-accent hover:text-accent-foreground transition-all duration-200"
           >
             Login
           </Button>
         </div>
-        <p className="text-center text-gray-300">
+        <p className="text-center text-muted-foreground">
           Don't have an account?{' '}
-          <Link className="text-blue-400 hover:text-blue-300 transition-colors" to="/signup">
+          <Link className="text-accent hover:text-primary transition-colors" to="/signup">
             Sign up
           </Link>
         </p>

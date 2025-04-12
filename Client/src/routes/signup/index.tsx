@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useRouter } from '@tanstack/react-router'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Logo } from '@/components/logo/logo'
@@ -14,8 +14,12 @@ function SignupPage() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
 
+  // ✅ Force dark mode globally
+  useEffect(() => {
+    document.documentElement.classList.add('dark')
+  }, [])
+
   async function handleSignup() {
-    //TODO: sighup
     try {
       const response = await fetch('http://localhost:4000/auth/signup', {
         method: 'POST',
@@ -39,14 +43,20 @@ function SignupPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-gray-900 to-gray-800 flex justify-center items-center">
-      <div className="max-w-lg w-full space-y-6 p-8 bg-gray-800 rounded-xl shadow-2xl">
+    <div className="min-h-screen bg-background flex justify-center items-center text-foreground">
+      <div className="max-w-lg w-full space-y-6 p-8 bg-card rounded-xl shadow-2xl border border-border">
         <Logo className="mb-8" />
-        <h2 className="text-2xl font-semibold text-center text-gray-300">Create an account</h2>
-        {error && <p className="text-center text-red-500">{error}</p>}
-        <div className="space-y-4">
+        <h2 className="text-2xl font-semibold text-center text-primary">Create an account</h2>
+        {error && <p className="text-center text-destructive">{error}</p>}
+        <form
+          onSubmit={(e) => {
+            e.preventDefault()
+            handleSignup()
+          }}
+          className="space-y-4"
+        >
           <div className="space-y-2">
-            <label htmlFor="username" className="block text-sm font-medium text-gray-300">
+            <label htmlFor="username" className="block text-sm font-medium text-foreground">
               Username
             </label>
             <Input
@@ -54,12 +64,13 @@ function SignupPage() {
               type="text"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              className="bg-gray-700 border-gray-600 text-white placeholder-gray-400"
+              className="bg-muted border-border text-foreground placeholder-muted-foreground"
               placeholder="Enter your username"
+              required
             />
           </div>
           <div className="space-y-2">
-            <label htmlFor="password" className="block text-sm font-medium text-gray-300">
+            <label htmlFor="password" className="block text-sm font-medium text-foreground">
               Password
             </label>
             <Input
@@ -67,20 +78,21 @@ function SignupPage() {
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="bg-gray-700 border-gray-600 text-white placeholder-gray-400"
+              className="bg-muted border-border text-foreground placeholder-muted-foreground"
               placeholder="Enter your password"
+              required
             />
           </div>
           <Button
-            onClick={handleSignup}
-            className="w-full bg-blue-500 hover:bg-blue-600 text-white py-2 rounded-lg font-semibold transition-all duration-200"
+            type="submit"
+            className="w-full bg-primary text-primary-foreground py-2 rounded-lg font-semibold hover:bg-accent hover:text-accent-foreground transition-all duration-200"
           >
             Sign Up
           </Button>
-        </div>
-        <p className="text-center text-gray-300">
+        </form>
+        <p className="text-center text-muted-foreground">
           Already have an account?{' '}
-          <Link to="/login" className="text-blue-400 hover:text-blue-300 transition-colors">
+          <Link to="/login" className="text-accent hover:text-primary transition-colors">
             Login
           </Link>
         </p>
