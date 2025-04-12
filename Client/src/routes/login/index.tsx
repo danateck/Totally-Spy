@@ -30,7 +30,8 @@ function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background flex justify-center items-center text-foreground">
+    <div className="min-h-screen bg-background flex justify-center items-center text-foreground"
+    style={{ backgroundImage: "url('/images/image.jpg')" }}>
       <div className="max-w-lg w-full space-y-6 p-8 bg-card rounded-xl shadow-2xl border border-border">
         <Logo className="mb-8" />
         <p className="text-center text-foreground">Please login to continue</p>
