@@ -38,7 +38,7 @@ function calculateContrast(imageData) {
     return Math.sqrt(variance);
 }
 
-// חישוב צבעוניות לפי ההפרש בין ערוצים
+// חישוב צבעוניות לפי ההפרש  
 function calculateColorfulness(imageData) {
     const data = imageData.data;
     let rgSum = 0, ybSum = 0;
