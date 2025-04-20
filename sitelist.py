@@ -22,7 +22,7 @@ otp_services = [
     {"name": "ChatGPT (OpenAI)", "usage": "Initial login", "method": "SMS"},
 ]
 
-#save as JASON
+#save  it as JASON
 with open("otp_services_list.json", "w", encoding="utf-8") as json_file:
     json.dump(otp_services, json_file, indent=4, ensure_ascii=False)
 
