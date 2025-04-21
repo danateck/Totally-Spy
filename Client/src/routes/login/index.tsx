@@ -1,8 +1,3 @@
-
-
-
-
-
 import { Logo } from '@/components/logo/logo'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -35,7 +30,8 @@ function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background flex justify-center items-center text-foreground">
+    <div className="min-h-screen bg-background flex justify-center items-center text-foreground"
+    style={{ backgroundImage: "url('/images/background.jpg')" }}>
       <div className="max-w-lg w-full space-y-6 p-8 bg-card rounded-xl shadow-2xl border border-border">
         <Logo className="mb-8" />
         <p className="text-center text-foreground">Please login to continue</p>
@@ -74,26 +70,3 @@ function LoginPage() {
     </div>
   )
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

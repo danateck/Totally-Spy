@@ -334,3 +334,53 @@ def delete_session(session_id: str):
         finally:
             conn.close()
     return None
+
+
+
+def delete_user(username: str):
+    conn = get_db_connection()
+    cur = conn.cursor()
+    try:
+        cur.execute("DELETE FROM users WHERE username = %s", (username,))
+        conn.commit()
+    finally:
+        cur.close()
+        conn.close()
+
+
+def delete_sessions_for_user(user_id: int):
+    conn = get_db_connection()
+    cur = conn.cursor()
+    try:
+        cur.execute("DELETE FROM sessions WHERE user_id = %s", (user_id,))
+        conn.commit()
+    finally:
+        cur.close()
+        conn.close()
+
+def get_scan_count_for_user(user_id: int) -> int:
+    conn = get_db_connection()
+    cur = conn.cursor()
+    try:
+        # Assuming your scan_history table has a user_id column instead of username
+        cur.execute("SELECT COUNT(*) FROM scan_history WHERE user_id = %s", (user_id,))
+        result = cur.fetchone()
+        return result[0] if result else 0
+    finally:
+        cur.close()
+        conn.close()
+
+def delete_record(record_id: str):
+    conn = get_db_connection()
+    cur = conn.cursor()
+    try:
+        cur.execute("DELETE FROM scan_history WHERE id = %s", (record_id,))
+        rows_affected = cur.rowcount
+        conn.commit()
+        return rows_affected > 0
+    except Exception as e:
+        conn.rollback()
+        raise e
+    finally:
+        cur.close()
+        conn.close()     

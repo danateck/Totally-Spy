@@ -1,35 +1,41 @@
-
-
-
-
-
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { Logo } from '@/components/logo/logo'
 import { useEffect, useState } from 'react'
+
+type Record = [number, string, string];
+
+// Helper function to check if a record has valid data
+function hasValidData(record: Record): boolean {
+  if (!record[2]) return false;
+  const trimmed = record[2].trim();
+  if (trimmed === '') return false;
+  return record[2].split('\n').some(line => line.trim() !== '');
+}
 
 export const Route = createFileRoute('/history/')({
   component: RouteComponent,
 })
 
 function RouteComponent() {
-  const [recordings, setRecordings] = useState([])
+  const [recordings, setRecordings] = useState<Record[]>([])
   const [error, setError] = useState<string | null>(null)
+  const [filterText, setFilterText] = useState('')
 
   useEffect(() => {
     async function fetchRecordings() {
       try {
-        const response = await fetch('/history/recordings',{credentials: 'include'})
+        const response = await fetch('/history/recordings', { credentials: 'include' })
 
-        // Check if the response is not okay (i.e., status code not in 2xx range)
         if (!response.ok) {
           throw new Error(`Error: ${response.status} - ${response.statusText}`)
         }
 
-        // Try to parse JSON response
         const contentType = response.headers.get('content-type')
         if (contentType && contentType.includes('application/json')) {
           const data = await response.json()
-          setRecordings(data.records)
+          // Filter out recordings with empty data
+          const filteredRecordings = data.records.filter(hasValidData);
+          setRecordings(filteredRecordings)
         } else {
           throw new Error('The server did not return valid JSON.')
         }
@@ -41,24 +47,39 @@ function RouteComponent() {
     fetchRecordings()
   }, [])
 
+  const filteredRecordings = recordings.filter(recording =>
+    recording[1].toLowerCase().includes(filterText.toLowerCase())
+  )
+
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div className="min-h-screen bg-background text-foreground"
+      style={{ backgroundImage: "url('/images/background.jpg')" }}>
       <div className="max-w-2xl mx-auto py-12 px-4 sm:px-6 lg:px-8">
         <Logo className="mb-12" />
+
+        <div className="mb-6">
+          <input
+            type="text"
+            placeholder="Filter by name..."
+            value={filterText}
+            onChange={(e) => setFilterText(e.target.value)}
+            className="px-4 py-2 rounded-lg bg-card border border-border text-foreground w-full sm:w-1/2 focus:outline-none focus:ring-2 focus:ring-accent transition-all"
+          />
+        </div>
 
         {error && !recordings.length && (
           <p className="text-muted-foreground text-center text-lg font-semibold">
             {error.includes('valid JSON') ? "You have no records" : error}
           </p>
         )}
-        {recordings.length === 0 && !error && (
+        {filteredRecordings.length === 0 && !error && (
           <p className="text-muted-foreground text-center text-lg font-semibold">
-            You have no records
+            No matching records found
           </p>
         )}
 
         <div className="space-y-4">
-          {recordings.map((recording: [number, string]) => (
+          {filteredRecordings.map((recording) => (
             <Link
               key={recording[0]}
               to="/history/$item"
@@ -110,13 +131,13 @@ function RouteComponent() {
         <div className="fixed bottom-8 left-0 right-0 flex justify-center space-x-4">
           <Link
             to="/dashboard"
-            className="px-6 py-3 bg-card hover:bg-accent rounded-lg font-semibold transition-all duration-200 flex items-center text-foreground hover:text-accent-foreground border border-border"
+            className="px-6 py-3 bg-muted hover:bg-muted-foreground rounded-lg font-semibold transition-all duration-200 flex items-center text-foreground"
           >
             <span className="mr-2">←</span> Back
           </Link>
           <Link
-            to="/"
-            className="px-6 py-3 bg-card hover:bg-accent rounded-lg font-semibold transition-all duration-200 flex items-center text-foreground hover:text-accent-foreground border border-border"
+            to="/history"
+            className="px-6 py-3 bg-muted hover:bg-muted-foreground rounded-lg font-semibold transition-all duration-200 flex items-center text-foreground"
           >
             Forward <span className="ml-2">→</span>
           </Link>
@@ -125,12 +146,3 @@ function RouteComponent() {
     </div>
   )
 }
-
-
-
-
-
-
-
-
-

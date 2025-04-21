@@ -18,7 +18,8 @@ function App() {
   const router = useRouter()
 
   return (
-    <div className="min-h-screen bg-background flex justify-center items-center">
+    <div className="min-h-screen bg-background flex justify-center items-center"
+    style={{ backgroundImage: "url('/images/background.jpg')" }}>
       <div className="text-center flex flex-col space-y-4">
         <Logo className="mb-0" />
         <p className="text-foreground">
