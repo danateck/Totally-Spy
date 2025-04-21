@@ -52,8 +52,6 @@ def get_ocr_confidence(image: ndarray) -> float:
     ]
     return sum(confidences) / len(confidences) if confidences else 0
 
-import string
-
 def get_ocr_score(image: ndarray) -> float:
     ocr_data = pytesseract.image_to_data(image, output_type=pytesseract.Output.DICT)
     confidences = []
@@ -71,23 +69,3 @@ def get_ocr_score(image: ndarray) -> float:
 
     avg_conf = sum(confidences) / len(confidences) if confidences else 0
     return avg_conf + 0.2 * valid_chars  # Give weight to actual readable content
-
-
-def __main__():
-    image_path = "C:/Users/medin/Downloads/try1.jpeg"
-    image = cv2.imread(image_path)
-
-    if image is None:
-        print("Error: Image not loaded. Check the file path!")
-    else:
-        print("Image loaded successfully!")
-        enhanced = enhance_image(image)
-
-        # Show result
-        cv2.imshow("Enhanced Image", enhanced)
-        cv2.waitKey(0)
-        cv2.destroyAllWindows()
-
-
-if __name__ == "__main__":
-    __main__()
