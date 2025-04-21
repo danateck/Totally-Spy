@@ -1,4 +1,4 @@
-// חישוב חדות בעזרת אופרטור Laplacian
+// Calculating sharpness using a Laplacian
 function calculateSharpnessLaplacian(imageData, width, height) {
     const data = imageData.data;
     let total = 0;
@@ -22,7 +22,7 @@ function calculateSharpnessLaplacian(imageData, width, height) {
     return total / (width * height);
 }
 
-// חישוב ניגודיות לפי סטיית תקן של גווני אפור
+// Calculating contrast using standard deviation of grayscale
 function calculateContrast(imageData) {
     const data = imageData.data;
     let sum = 0, sumSq = 0, n = data.length / 4;
@@ -38,7 +38,7 @@ function calculateContrast(imageData) {
     return Math.sqrt(variance);
 }
 
-// חישוב צבעוניות לפי ההפרש  
+// Calculating colorfulness using the difference between channels
 function calculateColorfulness(imageData) {
     const data = imageData.data;
     let rgSum = 0, ybSum = 0;
@@ -62,7 +62,7 @@ function calculateColorfulness(imageData) {
     return Math.sqrt(rgSum / n + ybSum / n) + 0.3 * Math.sqrt((rgMean / n) ** 2 + (ybMean / n) ** 2);
 }
 
-// שילוב של חדות, ניגודיות וצבעוניות לציון אחד
+// Combining sharpness, contrast, and colorfulness for a single score
 function scoreImage(imageData, width, height) {
     const sharpness = calculateSharpnessLaplacian(imageData, width, height);
     const contrast = calculateContrast(imageData);
@@ -71,7 +71,7 @@ function scoreImage(imageData, width, height) {
     return sharpness * 0.5 + contrast * 0.3 + colorfulness * 0.2;
 }
 
-// קבלת N התמונות עם הציון הגבוה ביותר
+// Getting the N images with the highest score
 function getTopImages(imageElements, topN = 3) {
     const canvas = document.createElement("canvas");
     const ctx = canvas.getContext("2d");
