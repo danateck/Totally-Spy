@@ -19,22 +19,30 @@ function formatDate(dateString: string): string {
   });
 }
 
-// Extract first row of data, splitting by newline
-function getFirstRow(data: string): { value: string, type: string } {
-  const firstLine = data.split('\n')[0];
-  const parts = firstLine.split(':');
-  
-  if (parts.length >= 2) {
-    return {
-      value: parts[0],
-      type: parts[1]
-    };
+// Extract all rows of data, splitting by newline
+function getAllRows(data: string): Array<{ value: string, type: string }> {
+  // Split by newline and filter out empty lines
+  const lines = data.split('\n').filter(line => line.trim() !== '');
+  if (lines.length === 0) {
+    return [{
+      value: 'No data',
+      type: 'Unknown'
+    }];
   }
-  
-  return {
-    value: firstLine,
-    type: 'Unknown'
-  };
+
+  return lines.map(line => {
+    const parts = line.split(':');
+    if (parts.length >= 2 && parts[1].trim() !== '') {
+      return {
+        value: parts[0].trim(),
+        type: parts[1].trim()
+      };
+    }
+    return {
+      value: line.trim(),
+      type: 'Unknown'
+    };
+  });
 }
 
 export const Route = createFileRoute('/history/$item')({
@@ -175,7 +183,7 @@ function RouteComponent() {
   }
 
   const record = data.record[0];
-  const { value, type } = getFirstRow(record[2]);
+  const rows = getAllRows(record[2]);
 
   return (
     <div className="min-h-screen bg-background text-foreground"
@@ -192,21 +200,25 @@ function RouteComponent() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4 text-sm">
-              <div className="space-y-1">
-                <p className="text-muted-foreground">Date</p>
-                <p className="text-foreground">{formatDate(record[1])}</p>
-              </div>
-              <div className="space-y-1">
-                <p className="text-muted-foreground">Data Type</p>
-                <p className="text-foreground">{type}</p>
-              </div>
+            <div className="space-y-1">
+              <p className="text-muted-foreground">Date</p>
+              <p className="text-foreground">{formatDate(record[1])}</p>
             </div>
 
             <div className="space-y-2">
               <p className="text-muted-foreground">Content</p>
-              <div className="bg-muted rounded-lg p-4">
-                <p className="text-foreground">{value}</p>
+              <div className="space-y-2">
+                {rows.map((row, index) => (
+                  <div key={index} className="bg-muted rounded-lg p-4 flex justify-between items-center">
+                    <div>
+                      <p className="text-foreground font-medium">{row.value}</p>
+                      <p className="text-sm text-muted-foreground mt-1">Type: {row.type}</p>
+                    </div>
+                    <div className="px-3 py-1 rounded-full text-xs font-medium bg-primary/10 text-primary">
+                      {`Entry ${index + 1}`}
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
             

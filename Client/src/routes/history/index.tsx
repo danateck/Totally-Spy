@@ -2,12 +2,22 @@ import { createFileRoute, Link } from '@tanstack/react-router'
 import { Logo } from '@/components/logo/logo'
 import { useEffect, useState } from 'react'
 
+type Record = [number, string, string];
+
+// Helper function to check if a record has valid data
+function hasValidData(record: Record): boolean {
+  if (!record[2]) return false;
+  const trimmed = record[2].trim();
+  if (trimmed === '') return false;
+  return record[2].split('\n').some(line => line.trim() !== '');
+}
+
 export const Route = createFileRoute('/history/')({
   component: RouteComponent,
 })
 
 function RouteComponent() {
-  const [recordings, setRecordings] = useState<[number, string][]>([])
+  const [recordings, setRecordings] = useState<Record[]>([])
   const [error, setError] = useState<string | null>(null)
   const [filterText, setFilterText] = useState('')
 
@@ -23,7 +33,9 @@ function RouteComponent() {
         const contentType = response.headers.get('content-type')
         if (contentType && contentType.includes('application/json')) {
           const data = await response.json()
-          setRecordings(data.records)
+          // Filter out recordings with empty data
+          const filteredRecordings = data.records.filter(hasValidData);
+          setRecordings(filteredRecordings)
         } else {
           throw new Error('The server did not return valid JSON.')
         }
@@ -35,8 +47,8 @@ function RouteComponent() {
     fetchRecordings()
   }, [])
 
-  const filteredRecordings = recordings.filter(([_, name]) =>
-    name.toLowerCase().includes(filterText.toLowerCase())
+  const filteredRecordings = recordings.filter(recording =>
+    recording[1].toLowerCase().includes(filterText.toLowerCase())
   )
 
   return (
@@ -45,7 +57,6 @@ function RouteComponent() {
       <div className="max-w-2xl mx-auto py-12 px-4 sm:px-6 lg:px-8">
         <Logo className="mb-12" />
 
-        {/* Filter Input */}
         <div className="mb-6">
           <input
             type="text"
@@ -68,7 +79,7 @@ function RouteComponent() {
         )}
 
         <div className="space-y-4">
-          {filteredRecordings.map((recording: [number, string]) => (
+          {filteredRecordings.map((recording) => (
             <Link
               key={recording[0]}
               to="/history/$item"
@@ -117,17 +128,16 @@ function RouteComponent() {
           ))}
         </div>
 
-        {/* Navigation Buttons */}
         <div className="fixed bottom-8 left-0 right-0 flex justify-center space-x-4">
           <Link
             to="/dashboard"
-            className="px-6 py-3 bg-card hover:bg-accent rounded-lg font-semibold transition-all duration-200 flex items-center text-foreground hover:text-accent-foreground border border-border"
+            className="px-6 py-3 bg-muted hover:bg-muted-foreground rounded-lg font-semibold transition-all duration-200 flex items-center text-foreground"
           >
             <span className="mr-2">←</span> Back
           </Link>
           <Link
-            to="/"
-            className="px-6 py-3 bg-card hover:bg-accent rounded-lg font-semibold transition-all duration-200 flex items-center text-foreground hover:text-accent-foreground border border-border"
+            to="/history"
+            className="px-6 py-3 bg-muted hover:bg-muted-foreground rounded-lg font-semibold transition-all duration-200 flex items-center text-foreground"
           >
             Forward <span className="ml-2">→</span>
           </Link>
