@@ -1,10 +1,5 @@
-
-
-
-
 import { Logo } from '@/components/logo/logo'
-import { createFileRoute } from '@tanstack/react-router'
-import { Link } from '@tanstack/react-router'
+import { createFileRoute, useRouter, Link } from '@tanstack/react-router'
 import { useAuth } from '@/hooks/useAuth'
 import {
   AlertDialog,
@@ -20,19 +15,46 @@ export const Route = createFileRoute('/dashboard/')({
 })
 
 function DashboardComponent() {
-  useAuth() // This will handle the authentication check and redirect
+  const { logout } = useAuth()
+  const router = useRouter()
   const [showDialog, setShowDialog] = useState(false)
 
   const handleUploadVideo = () => {
     setShowDialog(true)
-    // Hide the dialog after 3 seconds
     setTimeout(() => setShowDialog(false), 1000)
   }
 
+  const handleSignOut = async () => {
+    await logout()
+    router.navigate({ to: '/login' })
+  }
+
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div
+      className="min-h-screen bg-background text-foreground relative"
+      style={{ backgroundImage: "url('/images/background.jpg')" }}
+    >
+      {/* Sign Out Button in top-left corner */}
+      <div className="absolute top-4 left-4">
+        <button
+          onClick={handleSignOut}
+          className="text-sm text-white bg-black px-4 py-2 rounded-md shadow hover:bg-muted transition-all border border-border"
+        >
+          Sign Out
+        </button>
+      </div>
+
+      {/* Profile Button in top-right corner */}
+      <div className="absolute top-4 right-4">
+        <Link
+          to="/profile"
+          className="text-sm text-white bg-card px-4 py-2 rounded-md shadow hover:bg-accent transition-all border border-border"
+        >
+          My Profile
+        </Link>
+      </div>
+
       <div className="max-w-4xl mx-auto py-12 px-4 sm:px-6 lg:px-8">
-        {/* Logo */}
         <Logo className="mb-12" />
 
         {/* Alert Dialog */}
@@ -135,9 +157,3 @@ function DashboardComponent() {
     </div>
   )
 }
-
-
-
-
-
-
