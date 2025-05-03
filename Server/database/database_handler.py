@@ -207,63 +207,97 @@ def encrypt_data(user_id: int, plaintext: str) -> Optional[str]:
     return None
 
         
-def decrypt_data(user_id, encrypted_text):
-    conn = get_db_connection()
-    if conn:
-        try:
-            with conn.cursor() as cur:
-                cur.execute("SELECT encryption_key FROM users WHERE id = %s;", (user_id,))
-                key = cur.fetchone()
-                if key:
-                    # Ensure the key is in bytes
-                    key_bytes = bytes(key[0])
+# def decrypt_data(user_id, encrypted_text):
+#     conn = get_db_connection()
+#     if conn:
+#         try:
+#             with conn.cursor() as cur:
+#                 cur.execute("SELECT encryption_key FROM users WHERE id = %s;", (user_id,))
+#                 key = cur.fetchone()
+#                 if key:
+#                     # Ensure the key is in bytes
+#                     key_bytes = bytes(key[0])
 
-                    # Decrypt the encryption key
-                    decrypted_key = decrypt_user_key(key_bytes)
+#                     # Decrypt the encryption key
+#                     decrypted_key = decrypt_user_key(key_bytes)
 
-                    cipher = Fernet(decrypted_key)
+#                     cipher = Fernet(decrypted_key)
                     
-                    # Convert hex string back to bytes - no need for cleaning or replacing
-                    try:
-                        encrypted_text_bytes = binascii.unhexlify(encrypted_text)
-                        decrypted_text = cipher.decrypt(encrypted_text_bytes).decode('utf-8')
-                        return decrypted_text
-                    except Exception as e:
-                        logger.error(f"Error decrypting text: {e}")
-                        logger.error(f"Encrypted text: {encrypted_text}")
-                        return f"Decryption failed: {str(e)}"
-                else:
-                    logger.warning("No encryption key found for the user!")
-        except Exception as e:
-            logger.error(f"Encryption Error: {e}")
-        finally:
-            conn.close()
-    return None
+#                     # Convert hex string back to bytes - no need for cleaning or replacing
+#                     try:
+#                         encrypted_text_bytes = binascii.unhexlify(encrypted_text)
+#                         decrypted_text = cipher.decrypt(encrypted_text_bytes).decode('utf-8')
+#                         return decrypted_text
+#                     except Exception as e:
+#                         logger.error(f"Error decrypting text: {e}")
+#                         logger.error(f"Encrypted text: {encrypted_text}")
+#                         return f"Decryption failed: {str(e)}"
+#                 else:
+#                     logger.warning("No encryption key found for the user!")
+#         except Exception as e:
+#             logger.error(f"Encryption Error: {e}")
+#         finally:
+#             conn.close()
+#     return None
 
+def decrypt_data(encryption_key: bytes, encrypted_text: str) -> Optional[str]:
+    try:
+        decrypted_key = decrypt_user_key(encryption_key)
+        cipher = Fernet(decrypted_key)
+        encrypted_text_bytes = binascii.unhexlify(encrypted_text)
+        decrypted_text = cipher.decrypt(encrypted_text_bytes).decode('utf-8')
+        return decrypted_text
+    except Exception as e:
+        logger.error(f"Error decrypting text: {e}")
+        return f"Decryption failed: {str(e)}"
+
+
+
+# def get_scan_history(username: str) -> list[tuple[int, str, str]]:
+#     conn = get_db_connection()
+#     if conn:
+#         try:
+#             with conn.cursor() as cur:
+#                 # Fetch the user_id based on the provided username
+#                 cur.execute("SELECT id FROM users WHERE username = %s;", (username,))
+#                 user_id_result = cur.fetchone()
+#                 if user_id_result:
+#                     user_id = user_id_result[0]  # Extract user_id from the result
+#                     # Fetch the scan history for the user
+#                     cur.execute("SELECT id, scan_time, detected_text FROM scan_history WHERE user_id = %s;", (user_id,))
+#                     scans = cur.fetchall()
+#                     decrypted_scans = [(scan[0], scan[1], decrypt_data(user_id, scan[2])) for scan in scans]
+#                     return decrypted_scans
+#                 else:
+#                     logger.warning("No user found")
+#                     return []
+#         except Exception as e:
+#             logger.error(f"Error fetching scan history: {e}")
+#         finally:
+#             conn.close()
+#     return []
 
 def get_scan_history(username: str) -> list[tuple[int, str, str]]:
     conn = get_db_connection()
     if conn:
         try:
             with conn.cursor() as cur:
-                # Fetch the user_id based on the provided username
-                cur.execute("SELECT id FROM users WHERE username = %s;", (username,))
-                user_id_result = cur.fetchone()
-                if user_id_result:
-                    user_id = user_id_result[0]  # Extract user_id from the result
-                    # Fetch the scan history for the user
-                    cur.execute("SELECT id, scan_time, detected_text FROM scan_history WHERE user_id = %s;", (user_id,))
-                    scans = cur.fetchall()
-                    decrypted_scans = [(scan[0], scan[1], decrypt_data(user_id, scan[2])) for scan in scans]
-                    return decrypted_scans
-                else:
-                    logger.warning("No user found")
+                cur.execute("SELECT id, encryption_key FROM users WHERE username = %s;", (username,))
+                user_result = cur.fetchone()
+                if not user_result:
                     return []
+                user_id, encrypted_key = user_result
+                decrypted_key = bytes(encrypted_key)
+
+                cur.execute("SELECT id, scan_time, detected_text FROM scan_history WHERE user_id = %s;", (user_id,))
+                scans = cur.fetchall()
+                return [(scan[0], scan[1], decrypt_data(decrypted_key, scan[2])) for scan in scans]
         except Exception as e:
             logger.error(f"Error fetching scan history: {e}")
         finally:
             conn.close()
     return []
+
 
 def get_scan_history_by_id(user_id: int, record_id: int) -> list[tuple[int, str, str]]:
     conn = get_db_connection()

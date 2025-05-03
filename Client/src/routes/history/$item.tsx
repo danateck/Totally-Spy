@@ -40,7 +40,10 @@ function getFirstRow(data: string): { value: string, type: string } {
 export const Route = createFileRoute('/history/$item')({
   component: RouteComponent,
   loader: async ({ params }) => {
-    const response = await fetch(`/history/record/${params.item}`, {credentials: 'include'})
+    // Add cache parameter to prevent browser caching
+    const response = await fetch(`/history/record/${params.item}?t=${Date.now()}`, {
+      credentials: 'include'
+    })
     if (!response.ok) {
       throw new Error(`Error: ${response.status} - ${response.statusText}`)
     }
@@ -93,11 +96,36 @@ function ConfirmationModal({
 function RouteComponent() {
   useAuth() // Add authentication check
   const router = useRouter()
-  const data: RecordResponse = Route.useLoaderData()
+  const [data, setData] = useState<RecordResponse | null>(null)
+  const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
   const [showModal, setShowModal] = useState(false)
   const params = Route.useParams()
+  
+  useEffect(() => {
+    async function fetchData() {
+      setLoading(true)
+      try {
+        const response = await fetch(`/history/record/${params.item}?t=${Date.now()}`, {
+          credentials: 'include'
+        })
+        
+        if (!response.ok) {
+          throw new Error(`Error: ${response.status} - ${response.statusText}`)
+        }
+        
+        const responseData = await response.json()
+        setData(responseData)
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to load record')
+      } finally {
+        setLoading(false)
+      }
+    }
+    
+    fetchData()
+  }, [params.item])
   
   // Handle modal open
   const handleDeleteClick = () => {
@@ -130,8 +158,10 @@ function RouteComponent() {
         throw new Error(`Failed to delete: ${response.status} - ${response.statusText}`)
       }
       
-      // Redirect to history page after successful deletion
-      router.navigate({ to: '/history' })
+      // Immediately navigate back to history page
+      // Store the deleted ID in localStorage instead of route state
+      localStorage.setItem('deletedRecordId', params.item);
+      router.navigate({ to: '/history' });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to delete record')
       setIsDeleting(false)
@@ -151,9 +181,26 @@ function RouteComponent() {
     return () => window.removeEventListener('keydown', handleEscape);
   }, [showModal]);
   
+  // Show loading state
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background" 
+      style={{ backgroundImage: "url('/images/background.jpg')" }}>
+        <div className="max-w-2xl mx-auto py-12 px-4 sm:px-6 lg:px-8">
+          <Logo className="mb-12" />
+          <div className="bg-card rounded-xl shadow-2xl p-8 flex flex-col items-center justify-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary mb-4"></div>
+            <p className="text-muted-foreground">Loading record details...</p>
+          </div>
+        </div>
+      </div>
+    )
+  }
+  
   if (error || !data || !data.record || data.record.length === 0) {
     return (
-      <div className="min-h-screen bg-background">
+      <div className="min-h-screen bg-background"
+      style={{ backgroundImage: "url('/images/background.jpg')" }}>
         <div className="max-w-2xl mx-auto py-12 px-4 sm:px-6 lg:px-8">
           <Logo className="mb-12" />
           <div className="bg-card rounded-xl shadow-2xl p-8">
