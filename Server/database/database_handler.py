@@ -242,14 +242,30 @@ def encrypt_data(user_id: int, plaintext: str) -> Optional[str]:
 
 def decrypt_data(encryption_key: bytes, encrypted_text: str) -> Optional[str]:
     try:
+        # Ensure encryption_key is bytes (handle case where it's a tuple from fetchone)
+        if isinstance(encryption_key, tuple):
+            encryption_key = encryption_key[0]
+        if not isinstance(encryption_key, bytes):
+            raise ValueError("Encryption key must be bytes")
+
         decrypted_key = decrypt_user_key(encryption_key)
+        if not isinstance(decrypted_key, (bytes, str)):
+            raise ValueError("Decrypted key is not bytes or string")
+
         cipher = Fernet(decrypted_key)
+
+        # Ensure encrypted_text is a proper hex string before unhexlify
+        if not isinstance(encrypted_text, str):
+            raise ValueError("Encrypted text must be a string")
         encrypted_text_bytes = binascii.unhexlify(encrypted_text)
+
         decrypted_text = cipher.decrypt(encrypted_text_bytes).decode('utf-8')
         return decrypted_text
+
     except Exception as e:
         logger.error(f"Error decrypting text: {e}")
         return f"Decryption failed: {str(e)}"
+
 
 
 

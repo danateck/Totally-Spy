@@ -216,12 +216,7 @@ function RouteComponent() {
           >
             <span className="mr-2">←</span> Back
           </Link>
-          <Link
-            to="/"
-            className="px-6 py-3 bg-card hover:bg-accent rounded-lg font-semibold transition-all duration-200 flex items-center text-foreground hover:text-accent-foreground border border-border"
-          >
-            Forward <span className="ml-2">→</span>
-          </Link>
+        
         </div>
       </div>
     </div>
