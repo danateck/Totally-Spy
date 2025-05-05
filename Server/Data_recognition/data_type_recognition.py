@@ -36,6 +36,4 @@ def classify_text(text: str) -> list[tuple[str, str]]:
 
     return detected
 
-textr="Thing Small Thing First Name * Josh Email * Josh@CalderaWP.com Credit Card Number * 4692969881034678 Payment Method PayPal Credit Card Last Name * Pollock Phone * (646) 509 7777 Expiration * 01/29 Billing Zip Code * Total Total: 20 CVC * 345 PAY"
-print(classify_text(textr))
 
