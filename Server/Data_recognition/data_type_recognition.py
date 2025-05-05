@@ -13,13 +13,27 @@ patterns = {
     "DOMAIN": r"\b(?:https?://)?(?:www\.)?([\w\-]+\.[a-z]{2,}(?:\.[a-z]{2,})?)", #domain, url
 }
 
-def classify_text(text: str)-> list[tuple[str, str]]:
-    detected = []
-    # Go through each pattern and match it in the text
-    for label, pattern in patterns.items():
-        matches = re.findall(pattern, text)
-        for match in matches:
-            # Ensure that each match is classified once
-            detected.append((match, label))
-    return detected # results have data, data_type
+def classify_text(text: str) -> list[tuple[str, str]]:
+    detected = [] #store the matches found in the text, in the form of (value, label)
+    detected_spans = []  # (start, end) of already detected items. 
+    #to ensure that no match overlaps with another already detected match
+
+    # this list defines the order in which the patterns will be applied
+    priority_order = ["OTP", "EMAIL", "CREDIT_CARD", "PHONE_NUMBER", "PASSWORD", "ID", "DATE", "DOMAIN"]
+
+    for label in priority_order:
+        pattern = patterns[label]
+        for match in re.finditer(pattern, text): #find all matches for the current regex pattern in the text.
+            value = match.group(1) if match.groups() else match.group() #returns the first capturing group from the match
+            span = match.span() #start and end positions of the match in the text
+
+            # Skip if this match overlaps with anything already detected
+            if any(start <= span[0] < end or start < span[1] <= end for start, end in detected_spans):
+                continue
+
+            detected.append((value, label))
+            detected_spans.append(span)
+
+    return detected
+
 
