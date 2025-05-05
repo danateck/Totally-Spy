@@ -21,7 +21,7 @@ function SignupPage() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
 
-  // ✅ Force dark mode globally
+  //  Force dark mode globally
   useEffect(() => {
     document.documentElement.classList.add('dark')
   }, [])
@@ -36,7 +36,7 @@ function SignupPage() {
       })
 
       if (!response.ok) {
-        throw new Error('Signup failed')
+        throw new Error('Username already exists')
       }
 
       router.navigate({ to: '/dashboard' })
@@ -50,7 +50,8 @@ function SignupPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background flex justify-center items-center text-foreground">
+    <div className="min-h-screen bg-background flex justify-center items-center text-foreground"
+    style={{ backgroundImage: "url('/images/background.jpg')" }}>
       <div className="max-w-lg w-full space-y-6 p-8 bg-card rounded-xl shadow-2xl border border-border">
         <Logo className="mb-8" />
         <h2 className="text-2xl font-semibold text-center text-primary">Create an account</h2>

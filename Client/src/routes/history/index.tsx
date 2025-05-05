@@ -1,8 +1,3 @@
-
-
-
-
-
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { Logo } from '@/components/logo/logo'
 import { useEffect, useState } from 'react'
@@ -12,20 +7,19 @@ export const Route = createFileRoute('/history/')({
 })
 
 function RouteComponent() {
-  const [recordings, setRecordings] = useState([])
+  const [recordings, setRecordings] = useState<[number, string][]>([])
   const [error, setError] = useState<string | null>(null)
+  const [filterText, setFilterText] = useState('')
 
   useEffect(() => {
     async function fetchRecordings() {
       try {
-        const response = await fetch('/history/recordings',{credentials: 'include'})
+        const response = await fetch('/history/recordings', { credentials: 'include' })
 
-        // Check if the response is not okay (i.e., status code not in 2xx range)
         if (!response.ok) {
           throw new Error(`Error: ${response.status} - ${response.statusText}`)
         }
 
-        // Try to parse JSON response
         const contentType = response.headers.get('content-type')
         if (contentType && contentType.includes('application/json')) {
           const data = await response.json()
@@ -41,24 +35,40 @@ function RouteComponent() {
     fetchRecordings()
   }, [])
 
+  const filteredRecordings = recordings.filter(([_, name]) =>
+    name.toLowerCase().includes(filterText.toLowerCase())
+  )
+
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div className="min-h-screen bg-background text-foreground"
+      style={{ backgroundImage: "url('/images/background.jpg')" }}>
       <div className="max-w-2xl mx-auto py-12 px-4 sm:px-6 lg:px-8">
         <Logo className="mb-12" />
+
+        {/* Filter Input */}
+        <div className="mb-6">
+          <input
+            type="text"
+            placeholder="Filter by name..."
+            value={filterText}
+            onChange={(e) => setFilterText(e.target.value)}
+            className="px-4 py-2 rounded-lg bg-card border border-border text-foreground w-full sm:w-1/2 focus:outline-none focus:ring-2 focus:ring-accent transition-all"
+          />
+        </div>
 
         {error && !recordings.length && (
           <p className="text-muted-foreground text-center text-lg font-semibold">
             {error.includes('valid JSON') ? "You have no records" : error}
           </p>
         )}
-        {recordings.length === 0 && !error && (
+        {filteredRecordings.length === 0 && !error && (
           <p className="text-muted-foreground text-center text-lg font-semibold">
-            You have no records
+            No matching records found
           </p>
         )}
 
         <div className="space-y-4">
-          {recordings.map((recording: [number, string]) => (
+          {filteredRecordings.map((recording: [number, string]) => (
             <Link
               key={recording[0]}
               to="/history/$item"
@@ -107,6 +117,7 @@ function RouteComponent() {
           ))}
         </div>
 
+        {/* Navigation Buttons */}
         <div className="fixed bottom-8 left-0 right-0 flex justify-center space-x-4">
           <Link
             to="/dashboard"
@@ -125,12 +136,3 @@ function RouteComponent() {
     </div>
   )
 }
-
-
-
-
-
-
-
-
-
