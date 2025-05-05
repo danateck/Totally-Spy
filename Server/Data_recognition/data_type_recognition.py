@@ -2,7 +2,7 @@ import re
 
 
 patterns = {
-    "OTP": r"(?:(?:code|otp|one-time|passcode)[^\d]{0,10})?(\d{5,6})(?:[^\d]{0,10}(?:code|otp|one-time|passcode))?"
+    "OTP": r"(?:(?:code|otp|one-time|passcode)[^\d]{0,10}(\d{5,6})|(\d{5,6})[^\d]{0,10}(?:code|otp|one-time|passcode))"
 ,  #smart OTP catch -  5 or 6 digits
     "CREDIT_CARD": r"\b(?:\d{4}[- ]?){3}\d{4}\b",  # 16-digit CC, supports space or - separators
     "PHONE_NUMBER": r"\b\d{10}\b",  # Strictly 10-digit phone number
@@ -36,4 +36,6 @@ def classify_text(text: str) -> list[tuple[str, str]]:
 
     return detected
 
+textr="Thing Small Thing First Name * Josh Email * Josh@CalderaWP.com Credit Card Number * 4692969881034678 Payment Method PayPal Credit Card Last Name * Pollock Phone * (646) 509 7777 Expiration * 01/29 Billing Zip Code * Total Total: 20 CVC * 345 PAY"
+print(classify_text(textr))
 
