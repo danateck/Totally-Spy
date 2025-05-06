@@ -1,5 +1,4 @@
 import re
-from typing import List, Tuple
 from textblob import TextBlob  # Lightweight NLP
 
 # Precompile patterns for performance
