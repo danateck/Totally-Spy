@@ -9,7 +9,7 @@ patterns = {
     "EMAIL": re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b"),
     "PASSWORD": re.compile(r"(?=.*[A-Za-z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}"),
     "ID": re.compile(r"\b\d{9}\b"),
-    "DATE": re.compile(r"\b\d{1,2}[-/.]?\d{1,2}\b"),
+    "DATE": re.compile(r"\b\d{1,2}[-/.]\d{1,2}[-/.]\d{2,4}\b"),
     "DOMAIN": re.compile(r"\b(?:https?://)?(?:www\.)?([\w\-]+\.[a-z]{2,}(?:\.[a-z]{2,})?)"),
     "CVC": re.compile(r"(?i)(?:cvc|cvv|security code)[^\d]{0,10}(\d{3,4})"),
 }
