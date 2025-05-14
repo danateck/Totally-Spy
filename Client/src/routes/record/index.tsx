@@ -16,7 +16,6 @@ function RouteComponent() {
   const [showAlert, setShowAlert] = useState(false)
   const [alertMessage, setAlertMessage] = useState('')
   const [alertTitle, setAlertTitle] = useState('')
-  const [topImages, setTopImages] = useState<string[]>([])
 
   const handleStartRecording = () => {
     setIsRecording(true)
@@ -30,37 +29,25 @@ function RouteComponent() {
 
   const handleCapture = async (imageSrc: string) => {
     try {
-       // Get the detected cord_cropped_image and top images (using YOLO for object detection)
-      const cord_cropped_image  = await getcordForPhone(imageSrc); // Call getcord_cropped_image for object detection
-      cropped_image = getPhonesFromcord(imageSrc, findLargestPhoneFromcord(cord_cropped_image))
-      const topImages = await getTopImages(cropped_image); // Get top images after evaluating sharpness, contrast, etc.
+      const response = await fetch('http://localhost:4000/record/img', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({ image: imageSrc.split(',')[1] })
+      });
+      const data: ApiResponseFoundCode = await response.json();
 
-      setTopImages(topImages);  // Store top images for later use
-      setCapturedImage(imageSrc);  // Update captured image for preview
-
-      if (cord_cropped_image && topImages.length > 0) {
-        // Send the top images to the server
-        const response = await fetch('/record/img', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          credentials: 'include',
-          body: JSON.stringify({ image: topImages[0].split(',')[1] }), // Send the best top image to the server
-        });
-        
-        const data: ApiResponseFoundCode = await response.json();
-
-        if (!response.ok) {
-          console.error('Failed to send image to server');
-        } else if (data.message.length > 0 && !data.message[0].includes('No')) {
-          setAlertTitle(data.message[0] || 'Success');
-          setAlertMessage(data.message[1] || 'Code found!');
-          setShowAlert(true);
-        }
+      if (!response.ok) {
+        console.error('Failed to send image to server');
+      } else if (data.message.length > 0 && !data.message[0].includes('No')) {
+        setAlertTitle(data.message[0] || 'Success');
+        setAlertMessage(data.message[1] || 'Code found!');
+        setShowAlert(true);
       }
     } catch (error) {
-      console.error('Error capturing or sending image:', error);
+      console.error('Error sending image:', error);
     }
   }
 
