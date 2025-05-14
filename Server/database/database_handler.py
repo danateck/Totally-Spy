@@ -91,6 +91,214 @@ def create_scan_history_table():
         finally:
             conn.close()
 
+# Function to create Portfolio-related tables
+def create_portfolio_tables():
+    """Create the portfolios, portfolio_scans, and portfolio_members tables."""
+    conn = get_db_connection()
+    if conn:
+        try:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    CREATE TABLE IF NOT EXISTS portfolios (
+                        id SERIAL PRIMARY KEY,
+                        name TEXT NOT NULL,
+                        owner_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    );
+                """)
+
+                cur.execute("""
+                    CREATE TABLE IF NOT EXISTS portfolio_scans (
+                        id SERIAL PRIMARY KEY,
+                        portfolio_id INTEGER REFERENCES portfolios(id) ON DELETE CASCADE,
+                        scan_id INTEGER REFERENCES scan_history(id) ON DELETE CASCADE,
+                        added_by_user_id INTEGER REFERENCES users(id),
+                        added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    );
+                """)
+
+                cur.execute("""
+                    CREATE TABLE IF NOT EXISTS portfolio_members (
+                        id SERIAL PRIMARY KEY,
+                        portfolio_id INTEGER REFERENCES portfolios(id) ON DELETE CASCADE,
+                        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+                        role TEXT CHECK (role IN ('editor', 'viewer')) DEFAULT 'editor'
+                    );
+                """)
+                conn.commit()
+                logger.info("Portfolio-related tables created successfully.")
+        except Exception as e:
+            logger.error(f"Error creating portfolio tables: {e}")
+        finally:
+            conn.close()
+
+# Creates a new portfolio if user wants
+def add_portfolio(name: str, owner_id: int) -> Optional[int]:
+    conn = get_db_connection()
+    if conn:
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "INSERT INTO portfolios (name, owner_id) VALUES (%s, %s) RETURNING id;",
+                    (name, owner_id)
+                )
+                portfolio_id = cur.fetchone()[0]
+                conn.commit()
+                return portfolio_id
+        except Exception as e:
+            logger.error(f"Error creating portfolio: {e}")
+        finally:
+            conn.close()
+    return None
+
+# Assigns a scan to a portfolio.
+def add_scan_to_portfolio(portfolio_id: int, scan_id: int, added_by_user_id: int) -> bool:
+    conn = get_db_connection()
+    if conn:
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "INSERT INTO portfolio_scans (portfolio_id, scan_id, added_by_user_id) VALUES (%s, %s, %s);",
+                    (portfolio_id, scan_id, added_by_user_id)
+                )
+                conn.commit()
+                return True
+        except Exception as e:
+            logger.error(f"Error adding scan to portfolio: {e}")
+        finally:
+            conn.close()
+    return False
+
+# Adds another user to the portfolio with a role (editor/viewer).
+def share_portfolio_with_user(portfolio_id: int, user_id: int, role: str = 'editor') -> bool:
+    conn = get_db_connection()
+    if conn:
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "INSERT INTO portfolio_members (portfolio_id, user_id, role) VALUES (%s, %s, %s);",
+                    (portfolio_id, user_id, role)
+                )
+                conn.commit()
+                return True
+        except Exception as e:
+            logger.error(f"Error sharing portfolio: {e}")
+        finally:
+            conn.close()
+    return False
+
+# get Portfolios the User owns
+def get_portfolios_for_user(user_id: int) -> list[tuple[int, str]]:
+    conn = get_db_connection()
+    portfolios = []
+    if conn:
+        try:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT DISTINCT p.id, p.name
+                    FROM portfolios p
+                    LEFT JOIN portfolio_members pm ON p.id = pm.portfolio_id
+                    WHERE p.owner_id = %s OR pm.user_id = %s;
+                """, (user_id, user_id))
+                portfolios = cur.fetchall()
+        except Exception as e:
+            logger.error(f"Error getting portfolios: {e}")
+        finally:
+            conn.close()
+    return portfolios
+
+# get scans of a specific portfelio
+def get_scans_in_portfolio(user_id: int, portfolio_id: int) -> list[tuple[int, str, str]]:
+    """
+    Returns all scan records in a given portfolio that the requesting user has access to.
+    Each scan is decrypted using the key of the user who originally added it.
+
+    Parameters:
+        user_id (int): ID of the user making the request (to verify access).
+        portfolio_id (int): ID of the portfolio to fetch scans from.
+
+    Returns:
+        List of tuples (scan_id, scan_time, decrypted_text)
+    """
+    conn = get_db_connection()
+    scans = []
+    if conn:
+        try:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT sh.id, sh.scan_time, sh.detected_text, ps.added_by_user_id
+                    FROM scan_history sh
+                    JOIN portfolio_scans ps ON sh.id = ps.scan_id
+                    JOIN portfolios p ON ps.portfolio_id = p.id
+                    WHERE p.id = %s AND (
+                        p.owner_id = %s OR EXISTS (
+                            SELECT 1 FROM portfolio_members
+                            WHERE portfolio_id = p.id AND user_id = %s
+                        )
+                    );
+                """, (portfolio_id, user_id, user_id))
+
+                rows = cur.fetchall()
+                for scan_id, scan_time, encrypted_text, added_by_user_id in rows:
+                    decrypted = decrypt_data(added_by_user_id, encrypted_text)
+                    scans.append((scan_id, scan_time, decrypted))
+
+        except Exception as e:
+            logger.error(f"Error getting scans for portfolio {portfolio_id}: {e}")
+        finally:
+            conn.close()
+    return scans
+
+# Removes a specific scan from a given portfolio
+def delete_scan_from_portfolio(portfolio_id: int, scan_id: int) -> bool:
+    conn = get_db_connection()
+    if conn:
+        try:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    DELETE FROM portfolio_scans
+                    WHERE portfolio_id = %s AND scan_id = %s;
+                """, (portfolio_id, scan_id))
+                rows_deleted = cur.rowcount
+                conn.commit()
+                return rows_deleted > 0
+        except Exception as e:
+            logger.error(f"Error deleting scan from portfolio: {e}")
+        finally:
+            conn.close()
+    return False
+
+# Returns the role of a user in a portfolio
+def get_user_role_in_portfolio(user_id: int, portfolio_id: int) -> str:
+    conn = get_db_connection()
+    if conn:
+        try:
+            with conn.cursor() as cur:
+                # Check if the user is the owner
+                cur.execute("""
+                    SELECT 1 FROM portfolios
+                    WHERE id = %s AND owner_id = %s;
+                """, (portfolio_id, user_id))
+                if cur.fetchone():
+                    return 'owner'
+
+                # Check if the user is in the portfolio_members table
+                cur.execute("""
+                    SELECT role FROM portfolio_members
+                    WHERE portfolio_id = %s AND user_id = %s;
+                """, (portfolio_id, user_id))
+                result = cur.fetchone()
+                if result:
+                    return result[0]  # 'editor' or 'viewer'
+                else:
+                    return 'notmember'
+        except Exception as e:
+            logger.error(f"Error checking user role in portfolio: {e}")
+        finally:
+            conn.close()
+    return 'notmember'
+
+
 def get_user_id(username: str) -> int:
     conn = get_db_connection()
     if conn:
