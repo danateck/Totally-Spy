@@ -34,6 +34,7 @@ app.add_middleware(
 create_users_table()
 create_scan_history_table()
 create_session_table()
+create_portfolio_tables()
 
 class UserLogin(BaseModel):
     username: str
@@ -44,6 +45,20 @@ class UserDetails(BaseModel):
 
 class ImageData(BaseModel):
     image: str
+
+class PortfolioRequest(BaseModel):
+    name: str
+    portfolioId: int
+
+class SharePortfolioRequest(BaseModel):
+    portfolioId: int
+    targetUserId: int
+    role: str = "editor"
+
+class PortfolioScanRequest(BaseModel):
+    portfolioId: int
+    scanId: int
+
 
 def convert_to_formatted_string(detected_texts: list[tuple[str, str]]) -> str:
     # Join each tuple into a single line with label and value separated by ':'
@@ -208,6 +223,112 @@ async def delete_history_record(request: Request, user: User = Depends(get_curre
         return {"message": "Record deleted successfully"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to delete record: {str(e)}")
+
+# Create a new portfolio owned by the current user
+@app.post("/portfolio/create")
+async def create_portfolio_route(portfolio_data: PortfolioRequest, user: User = Depends(get_current_user)):
+    name = portfolio_data.name
+    portfolio_id = add_portfolio(name, user.id)
+    return {"portfolio_id": portfolio_id}
+
+# Get all portfolios that the current user owns or is a member of. returns a list of portfolio IDs and names.
+@app.get("/portfolio/list")
+async def list_user_portfolios(user: User = Depends(get_current_user)):
+    portfolios = get_portfolios_for_user(user.id)
+    return {"portfolios": portfolios}
+
+# Share a portfolio with another user by adding them as a member
+@app.post("/portfolio/share")
+async def share_portfolio(data: SharePortfolioRequest, user: User = Depends(get_current_user)):
+    if not data.portfolioId or not data.targetUserId:
+        raise HTTPException(status_code=400, detail="Missing portfolioId or targetUserId")
+    role = get_user_role_in_portfolio(user.id, data.portfolioId)
+    if role != "owner":
+        raise HTTPException(status_code=403, detail="You don't have access to this portfolio action.")
+
+    success = share_portfolio_with_user(data.portfolioId, data.targetUserId, data.role)
+    return {"success": success}
+
+# Add a scan record to a portfolio.
+@app.post("/portfolio/add_scan")
+async def add_scan_to_portfolio_route(data: PortfolioScanRequest, user: User = Depends(get_current_user)):
+    if not data.portfolioId or not data.scanId:
+        raise HTTPException(status_code=400, detail="Missing portfolioId or scanId")
+    role = get_user_role_in_portfolio(user.id, data.portfolioId)
+    if role == "notmember":
+        raise HTTPException(status_code=403, detail="You don't have access to this portfolio.")
+
+    added = add_scan_to_portfolio(data.portfolioId, data.scanId, user.id)
+    return {"added": added}
+
+# Remove a scan record from a portfolio. Only is allowed to remove scans.
+@app.post("/portfolio/remove_scan")
+async def remove_scan_from_portfolio(data: PortfolioScanRequest, user: User = Depends(get_current_user)):
+    if not data.portfolioId or not data.scanId:
+        raise HTTPException(status_code=400, detail="Missing portfolioId or scanId")
+    role = get_user_role_in_portfolio(user.id, data.portfolioId)
+    if role != "owner":
+        raise HTTPException(status_code=403, detail="You don't have access to this portfolio action.")
+
+    removed = delete_scan_from_portfolio(data.portfolioId, data.scanId)
+    return {"removed": removed}
+
+# Retrieve all scan records for a portfolio the user has access to.
+@app.get("/portfolio/{portfolio_id}/scans")
+async def get_scans(portfolio_id: int, user: User = Depends(get_current_user)):
+    role = get_user_role_in_portfolio(user.id, portfolio_id)
+    if role == "notmember":
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    scans = get_scans_in_portfolio(user.id, portfolio_id)
+    return {"scans": scans}
+
+#Get the role of the current user in a specified portfolio
+@app.get("/portfolio/{portfolio_id}/role")
+async def get_role(portfolio_id: int, user: User = Depends(get_current_user)):
+    role = get_user_role_in_portfolio(user.id, portfolio_id)
+    return {"role": role}
+
+@app.post("/portfolio/delete")
+async def delete_portfolio_route(data: PortfolioRequest, user: User = Depends(get_current_user)):
+    portfolio_id = data.portfolioId
+
+    role = get_user_role_in_portfolio(user.id, portfolio_id)
+    if role != "owner":
+        raise HTTPException(status_code=403, detail="You are not the owner of this portfolio.")
+
+    success = delete_portfolio(portfolio_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="Portfolio not found or already deleted.")
+
+    return {"deleted": success}
+
+@app.post("/portfolio/remove_member")
+async def remove_portfolio_member(
+    data: SharePortfolioRequest,  # Reuse or create a new one with userId to remove
+    user: User = Depends(get_current_user)
+):
+    portfolio_id = data.portfolioId
+    user_id_to_remove = data.targetUserId
+
+    if not portfolio_id or not user_id_to_remove:
+        raise HTTPException(status_code=400, detail="Missing portfolioId or targetUserId")
+
+    success = remove_member_from_portfolio(portfolio_id, user_id_to_remove, user.id)
+    if not success:
+        raise HTTPException(status_code=403, detail="You are not allowed to remove members.")
+    
+    return {"removed": success}
+
+@app.get("/portfolio/{portfolio_id}/members")
+async def list_portfolio_members(portfolio_id: int, user: User = Depends(get_current_user)):
+    role = get_user_role_in_portfolio(user.id, portfolio_id)
+    if role == "notmember":
+        raise HTTPException(status_code=403, detail="You are not a member of this portfolio.")
+    
+    members = get_portfolio_members(portfolio_id)
+    return {"members": members}
+
     
 
 @app.get("/{full_path:path}", response_class=FileResponse)
