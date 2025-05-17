@@ -11,6 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse, FileResponse
 from pydantic import BaseModel
+import cv2
 
 from Data_recognition.data_type_recognition import classify_text
 from Enhance_Image.pictureChange import enhance_image
@@ -70,7 +71,11 @@ def get_current_user(session_id: Optional[str] = Cookie(None)) -> User:
 def decode_base64_frame(base64_frame):
     img_data = base64.b64decode(base64_frame)
     img = Image.open(BytesIO(img_data))
-    return np.array(img)
+    # Convert PIL Image to numpy array and convert RGB to BGR
+    frame = np.array(img)
+    # Convert RGB to BGR (OpenCV format)
+    frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+    return frame
 
 # Mount the static files directory
 app.mount("/static", StaticFiles(directory=client_path), name="public")
