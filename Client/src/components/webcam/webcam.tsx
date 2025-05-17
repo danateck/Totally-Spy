@@ -450,13 +450,32 @@ const WebcamCapture: React.FC<{
           {Math.round(zoomLevel * 100)}% {opticalZoomSupported ? '(Optical)' : ''}
         </div>
         
+        {/* Camera controls */}
+        <div className="absolute top-4 right-20 flex space-x-2 z-20">
+          <button 
+            onClick={toggleCamera}
+            className="p-2 rounded-full bg-black/80 text-white hover:bg-black/90 backdrop-blur-sm"
+            title="Switch Camera"
+          >
+            <RefreshCw size={20} />
+          </button>
+          
+          <button 
+            onClick={toggleSettings}
+            className="p-2 rounded-full bg-black/80 text-white hover:bg-black/90 backdrop-blur-sm"
+            title="Settings"
+          >
+            <Settings size={20} />
+          </button>
+        </div>
+        
         {/* Quality indicator */}
-        <div className="absolute top-4 right-4 bg-black bg-opacity-50 text-white px-3 py-1 rounded-full text-sm font-medium z-10">
+        <div className="absolute top-4 right-4 bg-black/80 text-white px-3 py-1 rounded-full text-sm font-medium z-20 backdrop-blur-sm">
           {quality === "ultra" ? "ULTRA HD" : quality === "high" ? "HD" : "Standard"}
         </div>
         
         {/* Camera indicator */}
-        <div className="absolute bottom-4 left-4 bg-black bg-opacity-50 text-white px-3 py-1 rounded-full text-sm font-medium z-10">
+        <div className="absolute bottom-4 left-4 bg-black/80 text-white px-3 py-1 rounded-full text-sm font-medium z-20 backdrop-blur-sm">
           {facingMode === "environment" ? "Rear Camera" : "Front Camera"}
         </div>
         
@@ -500,8 +519,16 @@ const WebcamCapture: React.FC<{
         )}
       </div>
       
-      {/* Main controls */}
+      {/* Main controls - Zoom only */}
       <div className="flex items-center justify-center space-x-4 flex-wrap">
+        <button 
+          onClick={handleResetZoom}
+          className="p-2 rounded-full bg-gray-100 text-gray-600 hover:bg-gray-200"
+          title="Reset Zoom"
+        >
+          <Minimize size={24} />
+        </button>
+
         <button 
           onClick={handleZoomOut}
           disabled={zoomLevel <= 1}
@@ -525,68 +552,37 @@ const WebcamCapture: React.FC<{
         </button>
         
         <button 
-          onClick={handleResetZoom}
-          className="p-2 rounded-full bg-gray-100 text-gray-600 hover:bg-gray-200"
-          title="Reset Zoom"
-        >
-          <Minimize size={24} />
-        </button>
-        
-        <button 
           onClick={handleMaxZoom}
           className="p-2 rounded-full bg-gray-100 text-gray-600 hover:bg-gray-200"
           title="Maximum Zoom"
         >
           <Maximize size={24} />
         </button>
-        
-        <button 
-          onClick={toggleAutoFocus}
-          className={`p-2 rounded-full ${autoFocus ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-600'} hover:bg-opacity-80`}
-          title={autoFocus ? "Auto Focus On" : "Auto Focus Off"}
-        >
-          <Focus size={24} />
-        </button>
-        
-        <button 
-          onClick={toggleCamera}
-          className="p-2 rounded-full bg-blue-100 text-blue-600 hover:bg-blue-200"
-          title="Switch Camera"
-        >
-          <RotateCcw size={24} />
-        </button>
-        
-        <button 
-          onClick={refreshCameras}
-          className="p-2 rounded-full bg-gray-100 text-gray-600 hover:bg-gray-200"
-          title="Refresh Camera List"
-        >
-          <RefreshCw size={24} />
-        </button>
-        
-        <button 
-          onClick={toggleSettings}
-          className="p-2 rounded-full bg-gray-100 text-gray-600 hover:bg-gray-200"
-          title="Settings"
-        >
-          <Settings size={24} />
-        </button>
       </div>
       
       {/* Advanced settings panel */}
       {showSettings && (
-        <div className="p-4 bg-white rounded-lg shadow-lg border border-gray-200">
-          <h3 className="font-medium text-lg mb-3">Advanced Settings</h3>
+        <div className="p-4 bg-green-500/10 border border-green-500/20 rounded-lg shadow-lg">
+          <h3 className="font-medium text-lg mb-3 text-green-400">Advanced Settings</h3>
           
           <div className="space-y-4">
             {/* Camera selection */}
             {availableCameras.length > 0 && (
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Camera</label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-sm font-medium text-green-400">Select Camera</label>
+                  <button 
+                    onClick={refreshCameras}
+                    className="p-1 rounded-full bg-green-500/10 text-green-400 hover:bg-green-500/20"
+                    title="Refresh Camera List"
+                  >
+                    <RotateCcw size={16} />
+                  </button>
+                </div>
                 <select 
                   value={selectedCameraId}
                   onChange={(e) => selectCamera(e.target.value)}
-                  className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                  className="block w-full px-3 py-2 bg-green-500/10 border border-green-500/20 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 text-green-400"
                 >
                   <option value="">Auto ({facingMode === "environment" ? "Rear" : "Front"})</option>
                   {availableCameras.map((camera) => (
@@ -595,28 +591,31 @@ const WebcamCapture: React.FC<{
                     </option>
                   ))}
                 </select>
+                <div className="text-xs text-green-400/70 mt-1">
+                  Available Cameras: {availableCameras.length}
+                </div>
               </div>
             )}
             
             {/* Quality selection */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Quality</label>
+              <label className="block text-sm font-medium text-green-400 mb-1">Image Quality</label>
               <div className="flex space-x-2">
                 <button
                   onClick={() => changeQuality("standard")}
-                  className={`px-3 py-1 rounded ${quality === "standard" ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-700'}`}
+                  className={`px-3 py-1 rounded ${quality === "standard" ? 'bg-green-500 text-white' : 'bg-green-500/10 text-green-400 hover:bg-green-500/20'}`}
                 >
                   Standard
                 </button>
                 <button
                   onClick={() => changeQuality("high")}
-                  className={`px-3 py-1 rounded ${quality === "high" ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-700'}`}
+                  className={`px-3 py-1 rounded ${quality === "high" ? 'bg-green-500 text-white' : 'bg-green-500/10 text-green-400 hover:bg-green-500/20'}`}
                 >
                   High
                 </button>
                 <button
                   onClick={() => changeQuality("ultra")}
-                  className={`px-3 py-1 rounded ${quality === "ultra" ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-700'}`}
+                  className={`px-3 py-1 rounded ${quality === "ultra" ? 'bg-green-500 text-white' : 'bg-green-500/10 text-green-400 hover:bg-green-500/20'}`}
                 >
                   Ultra HD
                 </button>
@@ -625,8 +624,8 @@ const WebcamCapture: React.FC<{
             
             {/* Enhancement level */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Enhancement Level: {enhancementLevel}
+              <label className="block text-sm font-medium text-green-400 mb-1">
+                Image Enhancement: {enhancementLevel}
               </label>
               <input
                 type="range"
@@ -634,14 +633,17 @@ const WebcamCapture: React.FC<{
                 max="5"
                 value={enhancementLevel}
                 onChange={(e) => setEnhancementLevel(parseInt(e.target.value))}
-                className="w-full"
+                className="w-full accent-green-500"
               />
+              <div className="text-xs text-green-400/70 mt-1">
+                0: No enhancement - 5: Maximum enhancement
+              </div>
             </div>
             
             {/* Sharpness level */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Sharpness: {sharpness}
+              <label className="block text-sm font-medium text-green-400 mb-1">
+                Image Sharpness: {sharpness}
               </label>
               <input
                 type="range"
@@ -649,14 +651,37 @@ const WebcamCapture: React.FC<{
                 max="4"
                 value={sharpness}
                 onChange={(e) => setSharpness(parseInt(e.target.value))}
-                className="w-full"
+                className="w-full accent-green-500"
               />
+              <div className="text-xs text-green-400/70 mt-1">
+                0: No sharpening - 4: Maximum sharpness
+              </div>
+            </div>
+            
+            {/* Auto Focus section */}
+            <div>
+              <label className="block text-sm font-medium text-green-400 mb-1">
+                Auto Focus
+              </label>
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={() => setAutoFocus(true)}
+                  className={`px-3 py-1 rounded ${autoFocus ? 'bg-green-500 text-white' : 'bg-green-500/10 text-green-400 hover:bg-green-500/20'}`}
+                >
+                  On
+                </button>
+                <button
+                  onClick={() => setAutoFocus(false)}
+                  className={`px-3 py-1 rounded ${!autoFocus ? 'bg-green-500 text-white' : 'bg-green-500/10 text-green-400 hover:bg-green-500/20'}`}
+                >
+                  Off
+                </button>
+              </div>
             </div>
             
             {/* Camera capabilities info */}
-            <div className="text-sm text-gray-600 mt-2 border-t pt-2">
+            <div className="text-sm text-green-400/70 mt-2 border-t border-green-500/20 pt-2">
               <div>Optical Zoom: {opticalZoomSupported ? `Supported (up to ${maxOpticalZoom}x)` : "Not supported"}</div>
-              <div>Cameras Detected: {availableCameras.length}</div>
             </div>
           </div>
         </div>
