@@ -13,5 +13,3 @@ __pycache__/
 .env
 env/
 nohup.out
-.vscode/
-.vscode/launch.json
