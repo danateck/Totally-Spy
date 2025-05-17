@@ -662,5 +662,3 @@ def delete_record(record_id: str):
     finally:
         cur.close()
         conn.close()  
-if __name__ == "__main__":
-    create_portfolio_tables()
