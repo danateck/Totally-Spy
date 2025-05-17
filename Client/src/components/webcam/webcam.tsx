@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import Webcam from "react-webcam";
 import { ZoomIn, ZoomOut, Maximize, Minimize, Focus, Settings, RotateCcw, Camera, RefreshCw } from "lucide-react";
+import { getFilterStyle, processImage } from "@/lib/image-processing";
+import type { QualityLevel } from "@/lib/image-processing";
 
 // No need for custom interface as we're using 'any' type for constraints
 // to bypass TypeScript limitations with the browser APIs
@@ -8,7 +10,7 @@ import { ZoomIn, ZoomOut, Maximize, Minimize, Focus, Settings, RotateCcw, Camera
 const WebcamCapture: React.FC<{
   onCapture?: (imageSrc: string) => void;
   isRecording: boolean;
-  initialQuality?: "standard" | "high" | "ultra"; // Quality presets
+  initialQuality?: QualityLevel;
 }> = ({ onCapture, isRecording, initialQuality = "high" }) => {
   const webcamRef = useRef<Webcam>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -16,6 +18,8 @@ const WebcamCapture: React.FC<{
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const intervalRef = useRef<number | undefined>(undefined);
   const mediaStreamRef = useRef<MediaStream | null>(null);
+  const processedImageRef = useRef<string | null>(null);
+  const lastCaptureTimeRef = useRef<number>(0);
 
   // Connect webcam ref to video element for processing
   useEffect(() => {
@@ -164,6 +168,11 @@ const WebcamCapture: React.FC<{
     }
   }, [mediaStreamRef.current, opticalZoomSupported]);
 
+  // Calculate filter values based on quality settings
+  const getFilterStyleForPreview = useCallback(() => {
+    return getFilterStyle(quality, sharpness, enhancementLevel);
+  }, [quality, sharpness, enhancementLevel]);
+
   // Enhanced capture with post-processing for quality
   const capture = useCallback(() => {
     if (!webcamRef.current || !canvasRef.current || !videoRef.current) return;
@@ -172,101 +181,41 @@ const WebcamCapture: React.FC<{
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
+
+    // Wait for video to be ready
+    if (video.videoWidth === 0 || video.videoHeight === 0) {
+      console.warn('Video not ready yet');
+      return;
+    }
     
     // Set canvas dimensions to match video
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
     
-    // Calculate zoomed dimensions and position
-    const zoomedWidth = video.videoWidth / zoomLevel;
-    const zoomedHeight = video.videoHeight / zoomLevel;
+    // Draw the video frame
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
     
-    // Calculate source rectangle for zoomed capture
-    const sourceX = (video.videoWidth - zoomedWidth) / 2 - position.x;
-    const sourceY = (video.videoHeight - zoomedHeight) / 2 - position.y;
-    
-    // Draw the zoomed portion of the video to canvas
-    ctx.drawImage(
-      video,
-      sourceX, sourceY, zoomedWidth, zoomedHeight,  // Source rectangle
-      0, 0, canvas.width, canvas.height            // Destination rectangle
+    // Process the image with all enhancements
+    processImage(
+      ctx,
+      canvas.width,
+      canvas.height,
+      quality,
+      sharpness,
+      enhancementLevel,
+      zoomLevel,
+      position
     );
-    
-    // Apply enhancement based on current settings
-    if (quality !== "standard") {
-      // Apply sharpening filter for enhanced clarity
-      applySharpening(ctx, canvas.width, canvas.height, sharpness);
-      
-      // Apply additional enhancements based on level
-      if (quality === "ultra") {
-        applyColorEnhancement(ctx, canvas.width, canvas.height, enhancementLevel);
-      }
-    }
     
     // Get the enhanced image
     const imageSrc = canvas.toDataURL('image/jpeg', 0.95);
+    processedImageRef.current = imageSrc;
     
     if (imageSrc && onCapture) {
       onCapture(imageSrc);
     }
-  }, [webcamRef, canvasRef, videoRef, onCapture, quality, enhancementLevel, sharpness, zoomLevel, position]);
+  }, [webcamRef, canvasRef, videoRef, onCapture, quality, sharpness, enhancementLevel, zoomLevel, position]);
   
-  // Apply sharpening filter to enhance details
-  const applySharpening = (ctx: CanvasRenderingContext2D, width: number, height: number, intensity: number) => {
-    const imageData = ctx.getImageData(0, 0, width, height);
-    const data = imageData.data;
-    const factor = 0.25 * intensity;
-    const bias = 128 * (1 - factor);
-    
-    // Simple sharpening algorithm
-    const tempCanvas = document.createElement('canvas');
-    tempCanvas.width = width;
-    tempCanvas.height = height;
-    const tempCtx = tempCanvas.getContext('2d');
-    if (!tempCtx) return;
-    
-    tempCtx.drawImage(ctx.canvas, 0, 0);
-    const tempData = tempCtx.getImageData(0, 0, width, height).data;
-    
-    // Apply convolution filter
-    for (let y = 1; y < height - 1; y++) {
-      for (let x = 1; x < width - 1; x++) {
-        const pos = (y * width + x) * 4;
-        
-        for (let i = 0; i < 3; i++) {
-          const val = (
-            -tempData[pos - width * 4 + i] -
-            tempData[pos - 4 + i] +
-            9 * tempData[pos + i] -
-            tempData[pos + 4 + i] -
-            tempData[pos + width * 4 + i]
-          ) * factor + bias;
-          
-          data[pos + i] = Math.max(0, Math.min(255, val));
-        }
-      }
-    }
-    
-    ctx.putImageData(imageData, 0, 0);
-  };
-  
-  // Apply color enhancement
-  const applyColorEnhancement = (ctx: CanvasRenderingContext2D, width: number, height: number, level: number) => {
-    const imageData = ctx.getImageData(0, 0, width, height);
-    const data = imageData.data;
-    const contrast = 1 + (level * 0.1);
-    const brightness = level * 3;
-    
-    for (let i = 0; i < data.length; i += 4) {
-      // Apply contrast and brightness
-      data[i] = Math.max(0, Math.min(255, (data[i] - 128) * contrast + 128 + brightness));
-      data[i+1] = Math.max(0, Math.min(255, (data[i+1] - 128) * contrast + 128 + brightness));
-      data[i+2] = Math.max(0, Math.min(255, (data[i+2] - 128) * contrast + 128 + brightness));
-    }
-    
-    ctx.putImageData(imageData, 0, 0);
-  };
-
   // Handle zooming in with limits
   const handleZoomIn = () => {
     const newZoom = Math.min(zoomLevel + 0.25, opticalZoomSupported ? maxOpticalZoom : 4);
@@ -375,11 +324,24 @@ const WebcamCapture: React.FC<{
   // Handle recording interval
   useEffect(() => {
     if (isRecording) {
-      intervalRef.current = window.setInterval(capture, 750);
+      // Capture immediately when recording starts
+      capture();
+      
+      intervalRef.current = window.setInterval(() => {
+        const now = Date.now();
+        // Only send to server if we have a processed image and enough time has passed
+        if (processedImageRef.current && now - lastCaptureTimeRef.current >= 750) {
+          if (onCapture) {
+            onCapture(processedImageRef.current);
+            lastCaptureTimeRef.current = now;
+          }
+        }
+      }, 750);
     } else {
       if (intervalRef.current) {
         window.clearInterval(intervalRef.current);
       }
+      processedImageRef.current = null;
     }
 
     return () => {
@@ -387,7 +349,7 @@ const WebcamCapture: React.FC<{
         window.clearInterval(intervalRef.current);
       }
     };
-  }, [isRecording, capture]);
+  }, [isRecording, capture, onCapture]);
 
   // Add event listeners for mouse movements outside the component
   useEffect(() => {
@@ -453,7 +415,7 @@ const WebcamCapture: React.FC<{
   };
   
   // Handle quality change
-  const changeQuality = (newQuality: "standard" | "high" | "ultra") => {
+  const changeQuality = (newQuality: QualityLevel) => {
     setQuality(newQuality);
   };
 
@@ -499,7 +461,7 @@ const WebcamCapture: React.FC<{
             transition: isDragging ? 'none' : 'transform 0.2s ease-out',
             width: '100%',
             height: '100%',
-            filter: quality === "ultra" ? "contrast(1.05) brightness(1.05)" : "none" // Subtle enhancement
+            filter: getFilterStyleForPreview()
           }}
         >
           <Webcam
