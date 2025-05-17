@@ -161,7 +161,7 @@ def add_scan_to_portfolio(portfolio_id: int, scan_id: int, added_by_user_id: int
     role = get_user_role_in_portfolio(added_by_user_id, portfolio_id)
     if role not in ('owner', 'editor'):
         logger.warning(f"User {added_by_user_id} has no permission to add scans to portfolio {portfolio_id}")
-        return False
+        raise PermissionError("You do not have permission to add scans to this portfolio.")
 
     conn = get_db_connection()
     if conn:
@@ -175,27 +175,42 @@ def add_scan_to_portfolio(portfolio_id: int, scan_id: int, added_by_user_id: int
                 return True
         except Exception as e:
             logger.error(f"Error adding scan to portfolio: {e}")
+            raise
         finally:
             conn.close()
-    return False
+    raise RuntimeError("Database connection failed.")
 
 # Adds another user to the portfolio with a role (editor/viewer).
-def share_portfolio_with_user(portfolio_id: int, user_id: int, role: str = 'editor') -> bool:
+def share_portfolio_with_user(portfolio_id: int, requesting_user_id: int, target_user_id: int, role: str = 'editor') -> bool:
+    user_role = get_user_role_in_portfolio(requesting_user_id, portfolio_id)
+    if user_role not in ['owner', 'editor']:
+        logger.warning(f"User {requesting_user_id} attempted to share portfolio {portfolio_id} without permission.")
+        raise PermissionError("Only owners or editors can share portfolios.")
+
     conn = get_db_connection()
     if conn:
         try:
             with conn.cursor() as cur:
+                # Check if the user is already a member
+                cur.execute(
+                    "SELECT 1 FROM portfolio_members WHERE portfolio_id = %s AND user_id = %s;",
+                    (portfolio_id, target_user_id)
+                )
+                if cur.fetchone():
+                    raise ValueError("User is already a member of this portfolio.")
+
                 cur.execute(
                     "INSERT INTO portfolio_members (portfolio_id, user_id, role) VALUES (%s, %s, %s);",
-                    (portfolio_id, user_id, role)
+                    (portfolio_id, target_user_id, role)
                 )
                 conn.commit()
                 return True
         except Exception as e:
             logger.error(f"Error sharing portfolio: {e}")
+            raise
         finally:
             conn.close()
-    return False
+    raise RuntimeError("Database connection failed.")
 
 # Get all portfolios where the user is a member (including owner/editor/viewer)
 def get_portfolios_for_user(user_id: int) -> list[tuple[int, str]]:
@@ -276,7 +291,7 @@ def delete_scan_from_portfolio(portfolio_id: int, scan_id: int, requesting_user_
     role = get_user_role_in_portfolio(requesting_user_id, portfolio_id)
     if role not in ['owner', 'editor']:
         logger.warning(f"User {requesting_user_id} tried to delete scan {scan_id} from portfolio {portfolio_id} without sufficient permission.")
-        return False
+        raise PermissionError("You do not have permission to remove scans from this portfolio.")
 
     conn = get_db_connection()
     if conn:
@@ -288,13 +303,15 @@ def delete_scan_from_portfolio(portfolio_id: int, scan_id: int, requesting_user_
                 """, (portfolio_id, scan_id))
                 rows_deleted = cur.rowcount
                 conn.commit()
-                return rows_deleted > 0
+                if rows_deleted == 0:
+                    raise ValueError("No scan was removed — it may not exist in the specified portfolio.")
+                return True
         except Exception as e:
             logger.error(f"Error deleting scan from portfolio: {e}")
+            raise
         finally:
             conn.close()
-    return False
-
+    raise RuntimeError("Database connection failed.")
 
 # Returns the role of a user in a portfolio
 def get_user_role_in_portfolio(user_id: int, portfolio_id: int) -> str:
@@ -322,7 +339,8 @@ def remove_member_from_portfolio(portfolio_id: int, user_id_to_remove: int, requ
     role = get_user_role_in_portfolio(requesting_user_id, portfolio_id)
     if role != 'owner':
         logger.warning(f"User {requesting_user_id} tried to remove user {user_id_to_remove} but is not owner.")
-        return False
+        raise PermissionError("Only the owner can remove members.")
+
     conn = get_db_connection()
     if conn:
         try:
@@ -335,12 +353,18 @@ def remove_member_from_portfolio(portfolio_id: int, user_id_to_remove: int, requ
                 return cur.rowcount > 0
         except Exception as e:
             logger.error(f"Error removing user from portfolio: {e}")
+            raise
         finally:
             conn.close()
-    return False
+    raise RuntimeError("Database connection failed.")
 
 # delete a specific portfolio and related data
-def delete_portfolio(portfolio_id: int) -> bool:
+def delete_portfolio(portfolio_id: int, requesting_user_id: int) -> bool:
+    role = get_user_role_in_portfolio(requesting_user_id, portfolio_id)
+    if role != 'owner':
+        logger.warning(f"User {requesting_user_id} attempted to delete portfolio {portfolio_id} without owner permission.")
+        raise PermissionError("Only the owner can delete this portfolio.")
+
     conn = get_db_connection()
     if conn:
         try:
@@ -350,9 +374,10 @@ def delete_portfolio(portfolio_id: int) -> bool:
                 return cur.rowcount > 0
         except Exception as e:
             logger.error(f"Error deleting portfolio: {e}")
+            raise
         finally:
             conn.close()
-    return False
+    raise RuntimeError("Database connection failed.")
 
 # get all the members of the portfolio
 def get_portfolio_members(portfolio_id: int) -> list[tuple[int, str]]:
@@ -371,6 +396,53 @@ def get_portfolio_members(portfolio_id: int) -> list[tuple[int, str]]:
         finally:
             conn.close()
     return members
+
+def get_user_portfolios_and_unassigned_recordings(user_id: int) -> dict:
+    """
+    Returns the portfolios the user is a member of,
+    and their scans that are not assigned to any portfolio.
+    Format:
+    {
+        "portfolios": [(portfolio_id, name)],
+        "recordings": [(scan_id, scan_time, decrypted_text)]
+    }
+    """
+    result = {"portfolios": [], "recordings": []}
+
+    try:
+        # get portfolios for user
+        result["portfolios"] = get_portfolios_for_user(user_id)
+        user_name = get_user_name(user_id)
+        if user_name:
+            result["recordings"] = get_scan_history(user_name)
+        else:
+            logger.warning(f"User name not found for user_id {user_id}")
+    except Exception as e:
+        logger.error(f"Error retrieving portfolios and unassigned scans: {e}")
+
+    return result
+
+
+def get_user_name(user_id: int) -> str | None:
+    conn = get_db_connection()
+    if not conn:
+        logger.error("Failed to get DB connection.")
+        return None
+
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT username FROM users WHERE id = %s;", (user_id,))
+            result = cur.fetchone()
+            if result:
+                return result[0]
+            else:
+                return None  # User not found
+    except Exception as e:
+        logger.error(f"Error getting username: {e}")
+        return None
+    finally:
+        conn.close()
+   
 
 
 
