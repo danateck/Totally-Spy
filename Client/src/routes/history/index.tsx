@@ -131,8 +131,8 @@ function RouteComponent() {
       <div className="max-w-2xl mx-auto py-12 px-4 sm:px-6 lg:px-8">
         <Logo className="mb-12" />
 
-        {/* Filter Input */}
-        <div className="mb-6 flex items-center">
+        {/* Filter Input and Refresh Button */}
+        <div className="mb-6 flex items-center justify-between">
           <input
             type="text"
             placeholder="Filter by name..."
@@ -140,8 +140,26 @@ function RouteComponent() {
             onChange={(e) => setFilterText(e.target.value)}
             className="px-4 py-2 rounded-lg bg-card border border-border text-foreground w-full sm:w-1/2 focus:outline-none focus:ring-2 focus:ring-accent transition-all"
           />
-          {loading && recordings.length > 0 && (
-            <div className="ml-4 animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-primary"></div>
+          {recordings.length > 0 && (
+            <button
+              onClick={() => fetchRecordings()}
+              disabled={loading}
+              className="px-4 py-2 bg-primary text-primary-foreground rounded-lg flex items-center space-x-2 hover:bg-primary/90 transition-colors"
+            >
+              {loading ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-2 border-t-transparent border-white mr-2"></div>
+                  <span>Refreshing...</span>
+                </>
+              ) : (
+                <>
+                  <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                  <span>Refresh</span>
+                </>
+              )}
+            </button>
           )}
         </div>
 
@@ -206,31 +224,6 @@ function RouteComponent() {
           ))}
         </div>
 
-        {/* Pull to refresh button (when there are records) */}
-        {recordings.length > 0 && (
-          <div className="flex justify-center mt-6">
-            <button
-              onClick={() => fetchRecordings()}
-              disabled={loading}
-              className="px-4 py-2 bg-primary text-primary-foreground rounded-lg flex items-center space-x-2 hover:bg-primary/90 transition-colors"
-            >
-              {loading ? (
-                <>
-                  <div className="animate-spin rounded-full h-4 w-4 border-2 border-t-transparent border-white mr-2"></div>
-                  <span>Refreshing...</span>
-                </>
-              ) : (
-                <>
-                  <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                  </svg>
-                  <span>Refresh</span>
-                </>
-              )}
-            </button>
-          </div>
-        )}
-
         {/* Navigation Buttons */}
         <div className="fixed bottom-8 left-0 right-0 flex justify-center space-x-4">
           <Link
@@ -239,7 +232,6 @@ function RouteComponent() {
           >
             <span className="mr-2">←</span> Back
           </Link>
-        
         </div>
       </div>
     </div>
