@@ -12,6 +12,18 @@ function hasValidData(record: Record): boolean {
   return record[2].split('\n').some(line => line.trim() !== '');
 }
 
+// Format timestamp to readable date
+function formatTimestamp(timestamp: string): string {
+  const date = new Date(timestamp);
+  const year = date.getFullYear();
+  const month = date.toLocaleString('en-US', { month: 'short' });
+  const day = String(date.getDate()).padStart(2, '0');
+  const hours = String(date.getHours()).padStart(2, '0');
+  const minutes = String(date.getMinutes()).padStart(2, '0');
+  
+  return `${year} ${month} ${day} ${hours}:${minutes}`;
+}
+
 export const Route = createFileRoute('/history/')({
   component: RouteComponent,
 })
@@ -33,8 +45,10 @@ function RouteComponent() {
         const contentType = response.headers.get('content-type')
         if (contentType && contentType.includes('application/json')) {
           const data = await response.json()
-          // Filter out recordings with empty data
-          const filteredRecordings = data.records.filter(hasValidData);
+          // Filter out recordings with empty data and sort by timestamp (newest first)
+          const filteredRecordings = data.records
+            .filter(hasValidData)
+            .sort((a: Record, b: Record) => new Date(b[1]).getTime() - new Date(a[1]).getTime());
           setRecordings(filteredRecordings)
         } else {
           throw new Error('The server did not return valid JSON.')
@@ -105,7 +119,7 @@ function RouteComponent() {
                   </div>
                   <div>
                     <h3 className="text-lg font-medium text-primary group-hover:text-foreground transition-colors">
-                      {recording[1]} Recording
+                      {formatTimestamp(recording[1])}
                     </h3>
                     <p className="text-sm text-muted-foreground">Click to view details</p>
                   </div>
