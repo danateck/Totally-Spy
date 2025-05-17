@@ -229,7 +229,7 @@ async def delete_history_record(request: Request, user: User = Depends(get_curre
 async def create_portfolio_route(portfolio_data: PortfolioRequest, user: User = Depends(get_current_user)):
     name = portfolio_data.name
     portfolio_id = add_portfolio(name, user.id)
-    return {"portfolio_id": portfolio_id}
+    return {"portfolio_id": portfolio_id, "name": name}
 
 # Get all portfolios that the current user owns or is a member of. returns a list of portfolio IDs and names.
 @app.get("/portfolio/list")
@@ -242,36 +242,57 @@ async def list_user_portfolios(user: User = Depends(get_current_user)):
 async def share_portfolio(data: SharePortfolioRequest, user: User = Depends(get_current_user)):
     if not data.portfolioId or not data.targetUserId:
         raise HTTPException(status_code=400, detail="Missing portfolioId or targetUserId")
-    role = get_user_role_in_portfolio(user.id, data.portfolioId)
-    if role != "owner":
-        raise HTTPException(status_code=403, detail="You don't have access to this portfolio action.")
-
-    success = share_portfolio_with_user(data.portfolioId, data.targetUserId, data.role)
-    return {"success": success}
+    try:
+        success = share_portfolio_with_user(
+            portfolio_id=data.portfolioId,
+            requesting_user_id=user.id,
+            target_user_id=data.targetUserId,
+            role=data.role
+        )
+        return {"success": success}
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=409, detail=str(e))  # Conflict try to share with a member
+    except RuntimeError as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    except Exception as e:
+        logger.exception("Unexpected error while sharing portfolio")
+        raise HTTPException(status_code=500, detail="An unexpected error occurred")
 
 # Add a scan record to a portfolio.
 @app.post("/portfolio/add_scan")
 async def add_scan_to_portfolio_route(data: PortfolioScanRequest, user: User = Depends(get_current_user)):
     if not data.portfolioId or not data.scanId:
         raise HTTPException(status_code=400, detail="Missing portfolioId or scanId")
-    role = get_user_role_in_portfolio(user.id, data.portfolioId)
-    if role == "notmember":
-        raise HTTPException(status_code=403, detail="You don't have access to this portfolio.")
-
-    added = add_scan_to_portfolio(data.portfolioId, data.scanId, user.id)
-    return {"added": added}
+    try:
+        added = add_scan_to_portfolio(data.portfolioId, data.scanId, user.id)
+        return {"added": added}
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+    except RuntimeError as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    except Exception as e:
+        logger.exception("Unexpected error while adding scan to portfolio")
+        raise HTTPException(status_code=500, detail="An unexpected error occurred")
 
 # Remove a scan record from a portfolio. Only is allowed to remove scans.
 @app.post("/portfolio/remove_scan")
 async def remove_scan_from_portfolio(data: PortfolioScanRequest, user: User = Depends(get_current_user)):
     if not data.portfolioId or not data.scanId:
         raise HTTPException(status_code=400, detail="Missing portfolioId or scanId")
-    role = get_user_role_in_portfolio(user.id, data.portfolioId)
-    if role != "owner":
-        raise HTTPException(status_code=403, detail="You don't have access to this portfolio action.")
-
-    removed = delete_scan_from_portfolio(data.portfolioId, data.scanId)
-    return {"removed": removed}
+    try:
+        removed = delete_scan_from_portfolio(data.portfolioId, data.scanId, user.id)
+        return {"removed": removed}
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except RuntimeError as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    except Exception as e:
+        logger.exception("Unexpected error while removing scan from portfolio")
+        raise HTTPException(status_code=500, detail="An unexpected error occurred")
 
 # Retrieve all scan records for a portfolio the user has access to.
 @app.get("/portfolio/{portfolio_id}/scans")
@@ -291,34 +312,35 @@ async def get_role(portfolio_id: int, user: User = Depends(get_current_user)):
 
 @app.post("/portfolio/delete")
 async def delete_portfolio_route(data: PortfolioRequest, user: User = Depends(get_current_user)):
-    portfolio_id = data.portfolioId
-
-    role = get_user_role_in_portfolio(user.id, portfolio_id)
-    if role != "owner":
-        raise HTTPException(status_code=403, detail="You are not the owner of this portfolio.")
-
-    success = delete_portfolio(portfolio_id)
-    if not success:
-        raise HTTPException(status_code=404, detail="Portfolio not found or already deleted.")
-
-    return {"deleted": success}
+    try:
+        deleted = delete_portfolio(data.portfolioId, user.id)
+        return {"deleted": deleted}
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+    except RuntimeError as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    except Exception as e:
+        logger.exception("Unexpected error while deleting portfolio")
+        raise HTTPException(status_code=500, detail="An unexpected error occurred")
 
 @app.post("/portfolio/remove_member")
 async def remove_portfolio_member(
-    data: SharePortfolioRequest,  # Reuse or create a new one with userId to remove
+    data: SharePortfolioRequest,
     user: User = Depends(get_current_user)
 ):
-    portfolio_id = data.portfolioId
-    user_id_to_remove = data.targetUserId
-
-    if not portfolio_id or not user_id_to_remove:
+    if not data.portfolioId or not data.targetUserId:
         raise HTTPException(status_code=400, detail="Missing portfolioId or targetUserId")
 
-    success = remove_member_from_portfolio(portfolio_id, user_id_to_remove, user.id)
-    if not success:
-        raise HTTPException(status_code=403, detail="You are not allowed to remove members.")
-    
-    return {"removed": success}
+    try:
+        removed = remove_member_from_portfolio(data.portfolioId, data.targetUserId, user.id)
+        return {"removed": removed}
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+    except RuntimeError as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    except Exception as e:
+        logger.exception("Unexpected error while removing member from portfolio")
+        raise HTTPException(status_code=500, detail="An unexpected error occurred")
 
 @app.get("/portfolio/{portfolio_id}/members")
 async def list_portfolio_members(portfolio_id: int, user: User = Depends(get_current_user)):
@@ -329,6 +351,13 @@ async def list_portfolio_members(portfolio_id: int, user: User = Depends(get_cur
     members = get_portfolio_members(portfolio_id)
     return {"members": members}
 
+@app.get("/portfolio/overview")
+async def portfolio_overview(user: User = Depends(get_current_user)):
+    try:
+        data = get_user_portfolios_and_unassigned_recordings(user.id)
+        return data
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="Failed to retrieve portfolio overview")
     
 
 @app.get("/{full_path:path}", response_class=FileResponse)
