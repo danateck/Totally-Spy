@@ -582,11 +582,11 @@ const WebcamCapture: React.FC<{
                 <select 
                   value={selectedCameraId}
                   onChange={(e) => selectCamera(e.target.value)}
-                  className="block w-full px-3 py-2 bg-green-500/10 border border-green-500/20 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 text-green-400"
+                  className="block w-full px-3 py-2 bg-black/80 border border-green-500/20 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 text-green-400 backdrop-blur-sm"
                 >
-                  <option value="">Auto ({facingMode === "environment" ? "Rear" : "Front"})</option>
+                  <option value="" className="bg-black/90">Auto ({facingMode === "environment" ? "Rear" : "Front"})</option>
                   {availableCameras.map((camera) => (
-                    <option key={camera.deviceId} value={camera.deviceId}>
+                    <option key={camera.deviceId} value={camera.deviceId} className="bg-black/90">
                       {camera.label || `Camera ${camera.deviceId.substring(0, 5)}...`}
                     </option>
                   ))}
