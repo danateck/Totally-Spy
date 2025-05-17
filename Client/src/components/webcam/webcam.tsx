@@ -35,7 +35,7 @@ const WebcamCapture: React.FC<{
   const [showSettings, setShowSettings] = useState(false);
   
   // Camera state
-  const [facingMode, setFacingMode] = useState<"user" | "environment">("user");
+  const [facingMode, setFacingMode] = useState<"user" | "environment">("environment");
   const [availableCameras, setAvailableCameras] = useState<MediaDeviceInfo[]>([]);
   const [selectedCameraId, setSelectedCameraId] = useState<string>("");
   const [isLoadingCameras, setIsLoadingCameras] = useState(true);
@@ -48,7 +48,7 @@ const WebcamCapture: React.FC<{
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const [autoFocus, setAutoFocus] = useState(true);
-
+  
   // Get initial video constraints
   const getVideoConstraints = useCallback(() => {
     const constraints: any = {
@@ -86,7 +86,15 @@ const WebcamCapture: React.FC<{
       
       // If we found cameras and don't have one selected, pick the first
       if (videoDevices.length > 0 && !selectedCameraId) {
-        setSelectedCameraId(videoDevices[0].deviceId);
+        // Try to find the environment camera first
+        const environmentCamera = videoDevices.find(device => 
+          device.label.toLowerCase().includes('back') || 
+          device.label.toLowerCase().includes('rear') ||
+          device.label.toLowerCase().includes('environment')
+        );
+        
+        // If we found an environment camera, use it, otherwise use the first camera
+        setSelectedCameraId(environmentCamera?.deviceId || videoDevices[0].deviceId);
       }
     } catch (error) {
       console.error("Error accessing media devices:", error);
