@@ -177,8 +177,20 @@ const WebcamCapture: React.FC<{
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
     
-    // Draw the current frame from video to canvas
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    // Calculate zoomed dimensions and position
+    const zoomedWidth = video.videoWidth / zoomLevel;
+    const zoomedHeight = video.videoHeight / zoomLevel;
+    
+    // Calculate source rectangle for zoomed capture
+    const sourceX = (video.videoWidth - zoomedWidth) / 2 - position.x;
+    const sourceY = (video.videoHeight - zoomedHeight) / 2 - position.y;
+    
+    // Draw the zoomed portion of the video to canvas
+    ctx.drawImage(
+      video,
+      sourceX, sourceY, zoomedWidth, zoomedHeight,  // Source rectangle
+      0, 0, canvas.width, canvas.height            // Destination rectangle
+    );
     
     // Apply enhancement based on current settings
     if (quality !== "standard") {
@@ -197,7 +209,7 @@ const WebcamCapture: React.FC<{
     if (imageSrc && onCapture) {
       onCapture(imageSrc);
     }
-  }, [webcamRef, canvasRef, videoRef, onCapture, quality, enhancementLevel, sharpness]);
+  }, [webcamRef, canvasRef, videoRef, onCapture, quality, enhancementLevel, sharpness, zoomLevel, position]);
   
   // Apply sharpening filter to enhance details
   const applySharpening = (ctx: CanvasRenderingContext2D, width: number, height: number, intensity: number) => {
