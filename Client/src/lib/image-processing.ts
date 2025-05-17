@@ -37,7 +37,8 @@ export const processImage = (
   sharpness: number,
   enhancementLevel: number,
   zoomLevel: number = 1,
-  position: { x: number; y: number } = { x: 0, y: 0 }
+  position: { x: number; y: number } = { x: 0, y: 0 },
+  isOpticalZoom: boolean = false
 ) => {
   // Safety checks
   if (!ctx || !width || !height || width <= 0 || height <= 0) {
@@ -52,8 +53,8 @@ export const processImage = (
     const imageData = ctx.getImageData(0, 0, width, height);
     const data = imageData.data;
 
-    // Apply zoom and position adjustments
-    if (zoomLevel > 1) {
+    // Apply zoom and position adjustments only for virtual zoom
+    if (zoomLevel > 1 && !isOpticalZoom) {
       const zoomedWidth = width / zoomLevel;
       const zoomedHeight = height / zoomLevel;
       const sourceX = (width - zoomedWidth) / 2 - position.x;

@@ -130,12 +130,6 @@ const WebcamCapture: React.FC<{
       }
     };
 
-    // Store media stream reference when available
-    const handleUserMedia = (stream: MediaStream) => {
-      mediaStreamRef.current = stream;
-      checkOpticalZoomCapability();
-    };
-
     if (webcamRef.current) {
       webcamRef.current.video?.addEventListener('loadedmetadata', () => checkOpticalZoomCapability());
     }
@@ -179,7 +173,10 @@ const WebcamCapture: React.FC<{
     
     const video = videoRef.current;
     const canvas = canvasRef.current;
-    const ctx = canvas.getContext('2d');
+    const ctx = canvas.getContext('2d', { 
+      alpha: false,
+      willReadFrequently: true  // Add this for better performance when reading canvas data
+    });
     if (!ctx) return;
 
     // Wait for video to be ready
@@ -188,11 +185,15 @@ const WebcamCapture: React.FC<{
       return;
     }
     
-    // Set canvas dimensions to match video
+    // Set canvas dimensions to match video's actual dimensions
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
     
-    // Draw the video frame
+    // Enable image smoothing for better quality
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+    
+    // Draw the video frame at full resolution
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
     
     // Process the image with all enhancements
@@ -204,17 +205,14 @@ const WebcamCapture: React.FC<{
       sharpness,
       enhancementLevel,
       zoomLevel,
-      position
+      position,
+      opticalZoomSupported
     );
     
-    // Get the enhanced image
+    // Get the enhanced image with good quality from the processed context
     const imageSrc = canvas.toDataURL('image/jpeg', 0.95);
     processedImageRef.current = imageSrc;
-    
-    if (imageSrc && onCapture) {
-      onCapture(imageSrc);
-    }
-  }, [webcamRef, canvasRef, videoRef, onCapture, quality, sharpness, enhancementLevel, zoomLevel, position]);
+  }, [webcamRef, canvasRef, videoRef, quality, sharpness, enhancementLevel, zoomLevel, position, opticalZoomSupported]);
   
   // Handle zooming in with limits
   const handleZoomIn = () => {
@@ -254,6 +252,11 @@ const WebcamCapture: React.FC<{
     }
   };
 
+  const handleResetCamera = () => {
+    handleResetZoom();
+    setPosition({ x: 0, y: 0 });
+  };
+
   // Maximize zoom
   const handleMaxZoom = () => {
     const maxZoom = opticalZoomSupported ? maxOpticalZoom : 4;
@@ -271,8 +274,7 @@ const WebcamCapture: React.FC<{
     setSelectedCameraId(""); // Clear specific camera selection when toggling
     
     // Reset zoom when switching cameras
-    setZoomLevel(1);
-    setPosition({ x: 0, y: 0 });
+    handleResetCamera();
   };
 
   // Select a specific camera by ID
@@ -280,8 +282,7 @@ const WebcamCapture: React.FC<{
     setSelectedCameraId(deviceId);
     
     // Reset zoom when switching cameras
-    setZoomLevel(1);
-    setPosition({ x: 0, y: 0 });
+    handleResetCamera();
   };
 
   // Refresh camera list
@@ -329,12 +330,11 @@ const WebcamCapture: React.FC<{
       
       intervalRef.current = window.setInterval(() => {
         const now = Date.now();
-        // Only send to server if we have a processed image and enough time has passed
-        if (processedImageRef.current && now - lastCaptureTimeRef.current >= 750) {
-          if (onCapture) {
-            onCapture(processedImageRef.current);
-            lastCaptureTimeRef.current = now;
-          }
+        // Capture and send image every 750ms
+        capture();
+        if (processedImageRef.current && onCapture) {
+          onCapture(processedImageRef.current);
+          lastCaptureTimeRef.current = now;
         }
       }, 750);
     } else {
@@ -466,10 +466,10 @@ const WebcamCapture: React.FC<{
         >
           <Webcam
             audio={false}
+            width={3840}
             height={2160}
             ref={webcamRef}
             screenshotFormat="image/jpeg"
-            width={3840}
             videoConstraints={getVideoConstraints()}
             imageSmoothing={true}
             className="w-full h-full object-cover"
