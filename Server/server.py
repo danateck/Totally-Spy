@@ -18,6 +18,9 @@ from OCR.OCRManager import OCRManager
 from database.database_handler import *
 from YOLO8.detect_phone import DetectPhone, get_phones_from_cords, find_largest_phone_from_cords
 
+import sys
+from person_info_finder.person_info_finder import PersonInfoFinder
+
 app = FastAPI()
 ocr_manager = OCRManager()
 detector = DetectPhone('./YOLO8/best.pt')
@@ -226,3 +229,58 @@ async def serve_spa(full_path: str):
     
 
 
+# Initialize the PersonInfoFinder (add this near the top with your other initializations)
+person_finder = PersonInfoFinder(db_path="./database/people_database.db")
+
+@app.get("/api/person-info/{person_id}")
+async def get_person_info(person_id: str, user: User = Depends(get_current_user)):
+    """API endpoint to get information about a person by ID"""
+    try:
+        # Process the person ID and get the person data
+        force_refresh = False
+        person_data = person_finder.process_person(person_id, force_refresh=force_refresh)
+        
+        if person_data:
+            return {
+                "success": True, 
+                "message": "Person information retrieved successfully",
+                "data": person_data
+            }
+        else:
+            return {
+                "success": False,
+                "message": "Unable to retrieve person information",
+                "data": None
+            }
+    except Exception as e:
+        return {
+            "success": False,
+            "message": f"Error retrieving person information: {str(e)}",
+            "data": None
+        }
+
+@app.post("/api/person-info/{person_id}/refresh")
+async def refresh_person_info(person_id: str, user: User = Depends(get_current_user)):
+    """API endpoint to force refresh information about a person by ID"""
+    try:
+        # Process the person ID with force refresh
+        person_data = person_finder.process_person(person_id, force_refresh=True)
+        
+        if person_data:
+            return {
+                "success": True, 
+                "message": "Person information refreshed successfully",
+                "data": person_data
+            }
+        else:
+            return {
+                "success": False,
+                "message": "Unable to refresh person information",
+                "data": None
+            }
+    except Exception as e:
+        return {
+            "success": False,
+            "message": f"Error refreshing person information: {str(e)}",
+            "data": None
+        }

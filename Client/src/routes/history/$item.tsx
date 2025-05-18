@@ -277,8 +277,16 @@ function RouteComponent() {
             <span className="mr-2">←</span> Back
           </Link>
         
+          <Link
+              to="/personal"
+              className="px-6 py-3 bg-primary hover:bg-primary/90 rounded-lg font-semibold transition-all duration-200 flex items-center text-primary-foreground border border-border"
+            >
+              Personal Page
+          </Link>
         </div>
       </div>
+
+
       
       {/* Confirmation Modal */}
       <ConfirmationModal 

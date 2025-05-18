@@ -15,6 +15,7 @@ import { Route as IndexImport } from './routes/index'
 import { Route as SignupIndexImport } from './routes/signup/index'
 import { Route as RecordIndexImport } from './routes/record/index'
 import { Route as ProfileIndexImport } from './routes/profile/index'
+import { Route as PersonalIndexImport } from './routes/personal/index'
 import { Route as LoginIndexImport } from './routes/login/index'
 import { Route as HistoryIndexImport } from './routes/history/index'
 import { Route as DashboardIndexImport } from './routes/dashboard/index'
@@ -43,6 +44,12 @@ const RecordIndexRoute = RecordIndexImport.update({
 const ProfileIndexRoute = ProfileIndexImport.update({
   id: '/profile/',
   path: '/profile/',
+  getParentRoute: () => rootRoute,
+} as any)
+
+const PersonalIndexRoute = PersonalIndexImport.update({
+  id: '/personal/',
+  path: '/personal/',
   getParentRoute: () => rootRoute,
 } as any)
 
@@ -109,6 +116,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LoginIndexImport
       parentRoute: typeof rootRoute
     }
+    '/personal/': {
+      id: '/personal/'
+      path: '/personal'
+      fullPath: '/personal'
+      preLoaderRoute: typeof PersonalIndexImport
+      parentRoute: typeof rootRoute
+    }
     '/profile/': {
       id: '/profile/'
       path: '/profile'
@@ -141,6 +155,7 @@ export interface FileRoutesByFullPath {
   '/dashboard': typeof DashboardIndexRoute
   '/history': typeof HistoryIndexRoute
   '/login': typeof LoginIndexRoute
+  '/personal': typeof PersonalIndexRoute
   '/profile': typeof ProfileIndexRoute
   '/record': typeof RecordIndexRoute
   '/signup': typeof SignupIndexRoute
@@ -152,6 +167,7 @@ export interface FileRoutesByTo {
   '/dashboard': typeof DashboardIndexRoute
   '/history': typeof HistoryIndexRoute
   '/login': typeof LoginIndexRoute
+  '/personal': typeof PersonalIndexRoute
   '/profile': typeof ProfileIndexRoute
   '/record': typeof RecordIndexRoute
   '/signup': typeof SignupIndexRoute
@@ -164,6 +180,7 @@ export interface FileRoutesById {
   '/dashboard/': typeof DashboardIndexRoute
   '/history/': typeof HistoryIndexRoute
   '/login/': typeof LoginIndexRoute
+  '/personal/': typeof PersonalIndexRoute
   '/profile/': typeof ProfileIndexRoute
   '/record/': typeof RecordIndexRoute
   '/signup/': typeof SignupIndexRoute
@@ -177,6 +194,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/history'
     | '/login'
+    | '/personal'
     | '/profile'
     | '/record'
     | '/signup'
@@ -187,6 +205,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/history'
     | '/login'
+    | '/personal'
     | '/profile'
     | '/record'
     | '/signup'
@@ -197,6 +216,7 @@ export interface FileRouteTypes {
     | '/dashboard/'
     | '/history/'
     | '/login/'
+    | '/personal/'
     | '/profile/'
     | '/record/'
     | '/signup/'
@@ -209,6 +229,7 @@ export interface RootRouteChildren {
   DashboardIndexRoute: typeof DashboardIndexRoute
   HistoryIndexRoute: typeof HistoryIndexRoute
   LoginIndexRoute: typeof LoginIndexRoute
+  PersonalIndexRoute: typeof PersonalIndexRoute
   ProfileIndexRoute: typeof ProfileIndexRoute
   RecordIndexRoute: typeof RecordIndexRoute
   SignupIndexRoute: typeof SignupIndexRoute
@@ -220,6 +241,7 @@ const rootRouteChildren: RootRouteChildren = {
   DashboardIndexRoute: DashboardIndexRoute,
   HistoryIndexRoute: HistoryIndexRoute,
   LoginIndexRoute: LoginIndexRoute,
+  PersonalIndexRoute: PersonalIndexRoute,
   ProfileIndexRoute: ProfileIndexRoute,
   RecordIndexRoute: RecordIndexRoute,
   SignupIndexRoute: SignupIndexRoute,
@@ -240,6 +262,7 @@ export const routeTree = rootRoute
         "/dashboard/",
         "/history/",
         "/login/",
+        "/personal/",
         "/profile/",
         "/record/",
         "/signup/"
@@ -259,6 +282,9 @@ export const routeTree = rootRoute
     },
     "/login/": {
       "filePath": "login/index.tsx"
+    },
+    "/personal/": {
+      "filePath": "personal/index.tsx"
     },
     "/profile/": {
       "filePath": "profile/index.tsx"
