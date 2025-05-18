@@ -107,9 +107,9 @@ async def search_info(image_data: ImageData, user: User = Depends(get_current_us
         extracted_text = ocr_manager.extract_text(enhanced_image)
         detected_data = classify_text(extracted_text[0])
         str_data = convert_to_formatted_string(detected_data) 
-        insert_scan(user.username, str_data)
 
         if detected_data:
+            insert_scan(user.username, str_data)
             return {"message": detected_data}
         else:
             raise HTTPException(status_code=202, detail="No data found.")
