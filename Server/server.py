@@ -9,7 +9,7 @@ from PIL import Image
 from fastapi import Depends, FastAPI, Cookie, Response, Request, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import HTMLResponse, FileResponse
+from fastapi.responses import HTMLResponse, FileResponse, JSONResponse
 from pydantic import BaseModel
 
 from Data_recognition.data_type_recognition import classify_text
@@ -23,18 +23,25 @@ ocr_manager = OCRManager()
 detector = DetectPhone('./YOLO8/best.pt')
 client_path = "../Client/dist/"
 
+# Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:3000", "https://totallyspy.xyz"],  # Frontend URL
+    allow_origins=["http://localhost:5173", "http://localhost:3000", "https://totallyspy.xyz"],
     allow_credentials=True,
-    allow_methods=["*"],  # Allows all methods like GET, POST, etc.
-    allow_headers=["*"],  # Allows all headers
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
+
+# Mount static files
+app.mount("/assets", StaticFiles(directory=os.path.join(client_path, "assets")), name="assets")
+app.mount("/images", StaticFiles(directory=os.path.join(client_path, "images")), name="images")
+
 # On server start, ensure the user table is created
 create_users_table()
 create_scan_history_table()
 create_session_table()
 create_portfolio_tables()
+ensure_scan_history_columns()  # Ensure scan_history has all required columns
 
 class UserLogin(BaseModel):
     username: str
@@ -52,13 +59,38 @@ class PortfolioRequest(BaseModel):
 
 class SharePortfolioRequest(BaseModel):
     portfolioId: int
-    targetUserId: int
+    targetUsername: str
     role: str = "editor"
 
 class PortfolioScanRequest(BaseModel):
     portfolioId: int
     scanId: int
 
+class RenamePortfolioRequest(BaseModel):
+    portfolioId: int
+    newName: str
+
+class PortfolioNameResponse(BaseModel):
+    name: str
+
+class RenameScanRequest(BaseModel):
+    scanId: int
+    newName: str
+
+class PortfolioDeleteRequest(BaseModel):
+    portfolioId: int
+
+class ChangeMemberRoleRequest(BaseModel):
+    portfolioId: int
+    targetUsername: str
+    newRole: str
+
+class RemoveMemberRequest(BaseModel):
+    portfolioId: int
+    targetUsername: str
+
+class ScanOwnershipRequest(BaseModel):
+    scanId: int
 
 def convert_to_formatted_string(detected_texts: list[tuple[str, str]]) -> str:
     # Join each tuple into a single line with label and value separated by ':'
@@ -86,9 +118,6 @@ def decode_base64_frame(base64_frame):
     img_data = base64.b64decode(base64_frame)
     img = Image.open(BytesIO(img_data))
     return np.array(img)
-
-# Mount the static files directory
-app.mount("/static", StaticFiles(directory=client_path), name="public")
 
 @app.post("/record/img")
 async def search_info(image_data: ImageData, user: User = Depends(get_current_user)):
@@ -167,11 +196,6 @@ async def get_record(record_id: int, user: User = Depends(get_current_user)):
     record = get_scan_history_by_id(user.id, record_id)
     return {"record": record}
 
-@app.get("/", response_class=FileResponse)
-async def serve_index():
-    # Serve React's index.html for any unknown route
-    return FileResponse(client_path + "index.html")
-
 @app.post("/api/user/delete")
 async def delete_current_user(user: User = Depends(get_current_user)):
     try:
@@ -240,16 +264,25 @@ async def list_user_portfolios(user: User = Depends(get_current_user)):
 # Share a portfolio with another user by adding them as a member
 @app.post("/portfolio/share")
 async def share_portfolio(data: SharePortfolioRequest, user: User = Depends(get_current_user)):
-    if not data.portfolioId or not data.targetUserId:
-        raise HTTPException(status_code=400, detail="Missing portfolioId or targetUserId")
+    if not data.portfolioId or not data.targetUsername:
+        raise HTTPException(status_code=400, detail="Missing portfolioId or targetUsername")
+    
     try:
+        # Get the target user's ID from their username
+        target_user_id = get_user_id(data.targetUsername)
+        if not target_user_id:
+            raise HTTPException(status_code=404, detail="Target user not found")
+
         success = share_portfolio_with_user(
             portfolio_id=data.portfolioId,
             requesting_user_id=user.id,
-            target_user_id=data.targetUserId,
+            target_user_id=target_user_id,
             role=data.role
         )
         return {"success": success}
+    except HTTPException as e:
+        # Re-raise HTTP exceptions to preserve their status code and detail
+        raise e
     except PermissionError as e:
         raise HTTPException(status_code=403, detail=str(e))
     except ValueError as e:
@@ -311,36 +344,50 @@ async def get_role(portfolio_id: int, user: User = Depends(get_current_user)):
     return {"role": role}
 
 @app.post("/portfolio/delete")
-async def delete_portfolio_route(data: PortfolioRequest, user: User = Depends(get_current_user)):
+async def delete_portfolio_route(data: PortfolioDeleteRequest, user: User = Depends(get_current_user)):
     try:
-        deleted = delete_portfolio(data.portfolioId, user.id)
-        return {"deleted": deleted}
+        if delete_portfolio(data.portfolioId, user.id):
+            return {"message": "Portfolio deleted successfully"}
+        else:
+            raise HTTPException(status_code=404, detail="Portfolio not found")
     except PermissionError as e:
         raise HTTPException(status_code=403, detail=str(e))
-    except RuntimeError as e:
-        raise HTTPException(status_code=500, detail=str(e))
     except Exception as e:
-        logger.exception("Unexpected error while deleting portfolio")
-        raise HTTPException(status_code=500, detail="An unexpected error occurred")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/portfolio/remove_member")
-async def remove_portfolio_member(
-    data: SharePortfolioRequest,
-    user: User = Depends(get_current_user)
-):
-    if not data.portfolioId or not data.targetUserId:
-        raise HTTPException(status_code=400, detail="Missing portfolioId or targetUserId")
-
+async def remove_member(data: RemoveMemberRequest, user: User = Depends(get_current_user)):
+    if not data.portfolioId or not data.targetUsername:
+        raise HTTPException(status_code=400, detail="Missing required fields")
+    
     try:
-        removed = remove_member_from_portfolio(data.portfolioId, data.targetUserId, user.id)
-        return {"removed": removed}
+        # Get the target user's ID from their username
+        target_user_id = get_user_id(data.targetUsername)
+        if not target_user_id:
+            raise HTTPException(status_code=404, detail="Target user not found")
+
+        # Check if the requesting user is the owner
+        role = get_user_role_in_portfolio(user.id, data.portfolioId)
+        if role != 'owner':
+            raise HTTPException(status_code=403, detail="Only the portfolio owner can remove members")
+
+        # Remove the member
+        conn = get_db_connection()
+        if conn:
+            try:
+                with conn.cursor() as cur:
+                    cur.execute("""
+                        DELETE FROM portfolio_members 
+                        WHERE portfolio_id = %s AND user_id = %s;
+                    """, (data.portfolioId, target_user_id))
+                    conn.commit()
+                    return {"message": "Member removed successfully"}
+            finally:
+                conn.close()
     except PermissionError as e:
         raise HTTPException(status_code=403, detail=str(e))
-    except RuntimeError as e:
-        raise HTTPException(status_code=500, detail=str(e))
     except Exception as e:
-        logger.exception("Unexpected error while removing member from portfolio")
-        raise HTTPException(status_code=500, detail="An unexpected error occurred")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/portfolio/{portfolio_id}/members")
 async def list_portfolio_members(portfolio_id: int, user: User = Depends(get_current_user)):
@@ -360,19 +407,173 @@ async def portfolio_overview(user: User = Depends(get_current_user)):
         raise HTTPException(status_code=500, detail="Failed to retrieve portfolio overview")
     
 
-@app.get("/{full_path:path}", response_class=FileResponse)
+@app.get("/portfolio/{portfolio_id}/name", response_model=PortfolioNameResponse)
+async def get_portfolio_name(portfolio_id: int, user: User = Depends(get_current_user)):
+    logger.info(f"Fetching name for portfolio {portfolio_id} for user {user.id}")
+    try:
+        role = get_user_role_in_portfolio(user.id, portfolio_id)
+        if role == "notmember":
+            logger.warning(f"User {user.id} has no access to portfolio {portfolio_id}")
+            raise HTTPException(status_code=403, detail="Access denied")
+
+        conn = get_db_connection()
+        if not conn:
+            logger.error("Failed to connect to database")
+            raise HTTPException(status_code=500, detail="Database connection failed")
+
+        try:
+            with conn.cursor() as cur:
+                cur.execute("SELECT name FROM portfolios WHERE id = %s;", (portfolio_id,))
+                result = cur.fetchone()
+                if not result:
+                    logger.warning(f"Portfolio {portfolio_id} not found")
+                    raise HTTPException(status_code=404, detail="Portfolio not found")
+                logger.info(f"Found portfolio name: {result[0]}")
+                return {"name": result[0]}
+        finally:
+            conn.close()
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        logger.error(f"Error getting portfolio name: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/portfolio/data/{portfolio_id}")
+async def get_portfolio(portfolio_id: int, user: User = Depends(get_current_user)):
+    logger.info(f"Fetching portfolio {portfolio_id} for user {user.id}")
+    try:
+        role = get_user_role_in_portfolio(user.id, portfolio_id)
+        if role == "notmember":
+            logger.warning(f"User {user.id} has no access to portfolio {portfolio_id}")
+            raise HTTPException(status_code=403, detail="Access denied")
+
+        conn = get_db_connection()
+        if not conn:
+            logger.error("Failed to connect to database")
+            raise HTTPException(status_code=500, detail="Database connection failed")
+
+        try:
+            with conn.cursor() as cur:
+                cur.execute("SELECT id, name, owner_id FROM portfolios WHERE id = %s;", (portfolio_id,))
+                result = cur.fetchone()
+                if not result:
+                    logger.warning(f"Portfolio {portfolio_id} not found")
+                    raise HTTPException(status_code=404, detail="Portfolio not found")
+                
+                portfolio_id, name, owner_id = result
+                return {
+                    "id": portfolio_id,
+                    "name": name,
+                    "owner_id": owner_id,
+                    "role": role
+                }
+        finally:
+            conn.close()
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        logger.error(f"Error getting portfolio: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/portfolio/rename")
+async def rename_portfolio_route(data: RenamePortfolioRequest, user: User = Depends(get_current_user)):
+    if not data.portfolioId or not data.newName:
+        raise HTTPException(status_code=400, detail="Missing portfolioId or newName")
+    try:
+        renamed = rename_portfolio(data.portfolioId, data.newName, user.id)
+        return {"renamed": renamed}
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+    except RuntimeError as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    except Exception as e:
+        logger.exception("Unexpected error while renaming portfolio")
+        raise HTTPException(status_code=500, detail="An unexpected error occurred")
+
+@app.post("/history/rename")
+async def rename_scan(data: RenameScanRequest, user: User = Depends(get_current_user)):
+    try:
+        success = update_scan_name(data.scanId, user.id, data.newName)
+        if not success:
+            raise HTTPException(status_code=404, detail="Scan not found or you don't have permission to rename it")
+        return {"message": "Scan renamed successfully"}
+    except Exception as e:
+        logger.error(f"Error renaming scan: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/portfolio/change_role")
+async def change_member_role(data: ChangeMemberRoleRequest, user: User = Depends(get_current_user)):
+    if not data.portfolioId or not data.targetUsername or not data.newRole:
+        raise HTTPException(status_code=400, detail="Missing required fields")
+    
+    if data.newRole not in ['editor', 'viewer']:
+        raise HTTPException(status_code=400, detail="Invalid role. Must be 'editor' or 'viewer'")
+    
+    try:
+        # Get the target user's ID from their username
+        target_user_id = get_user_id(data.targetUsername)
+        if not target_user_id:
+            raise HTTPException(status_code=404, detail="Target user not found")
+
+        # Check if the requesting user is the owner
+        role = get_user_role_in_portfolio(user.id, data.portfolioId)
+        if role != 'owner':
+            raise HTTPException(status_code=403, detail="Only the portfolio owner can change member roles")
+
+        # Update the member's role
+        conn = get_db_connection()
+        if conn:
+            try:
+                with conn.cursor() as cur:
+                    cur.execute("""
+                        UPDATE portfolio_members 
+                        SET role = %s 
+                        WHERE portfolio_id = %s AND user_id = %s;
+                    """, (data.newRole, data.portfolioId, target_user_id))
+                    conn.commit()
+                    return {"message": "Role updated successfully"}
+            finally:
+                conn.close()
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/history/check_ownership")
+async def check_scan_ownership(data: ScanOwnershipRequest, user: User = Depends(get_current_user)):
+    try:
+        conn = get_db_connection()
+        if not conn:
+            raise HTTPException(status_code=500, detail="Database connection failed")
+
+        try:
+            with conn.cursor() as cur:
+                cur.execute("SELECT user_id FROM scan_history WHERE id = %s;", (data.scanId,))
+                result = cur.fetchone()
+                if not result:
+                    raise HTTPException(status_code=404, detail="Scan not found")
+                
+                is_owner = result[0] == user.id
+                return {"isOwner": is_owner}
+        finally:
+            conn.close()
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        logger.error(f"Error checking scan ownership: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/{full_path:path}")
 async def serve_spa(full_path: str):
-    # Remove any leading slashes and normalize the path
-    normalized_path = full_path.lstrip('/')
+    # Check if it's an API endpoint
+    if full_path.startswith(('api/', 'history/', 'auth/')):
+        # If it's an API endpoint that doesn't exist, return 404
+        raise HTTPException(status_code=404, detail="API endpoint not found")
     
-    # Construct the full file path within the client directory
-    file_path = os.path.join(client_path, normalized_path)
-    
-    # Check if the file exists and is within the client directory
-    if os.path.exists(file_path) and os.path.commonpath([os.path.abspath(file_path), os.path.abspath(client_path)]) == os.path.abspath(client_path):
-        return FileResponse(file_path)
+    # For all other routes, serve the index.html
+    index_path = os.path.join(client_path, "index.html")
+    if os.path.exists(index_path):
+        return FileResponse(index_path)
     else:
-        return FileResponse(client_path + "index.html")
-    
-
-
+        raise HTTPException(status_code=404, detail="index.html not found")
