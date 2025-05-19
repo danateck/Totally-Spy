@@ -77,6 +77,8 @@ function RouteComponent() {
             return null
           }).filter(Boolean)
         }
+        // Sort recordings by timestamp in descending order (newest first)
+        recordingData.sort((a: Recording, b: Recording) => new Date(b[1]).getTime() - new Date(a[1]).getTime())
         setRecordings(recordingData)
       } else {
         throw new Error('The server did not return valid JSON.')
