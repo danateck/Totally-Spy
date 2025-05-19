@@ -635,14 +635,31 @@ def get_scan_history_by_id(user_id: int, record_id: int) -> list[tuple[int, str,
     if conn:
         try:
             with conn.cursor() as cur:
+                # First, get the user's encryption key
+                cur.execute("SELECT encryption_key FROM users WHERE id = %s;", (user_id,))
+                encryption_key_result = cur.fetchone()
+                
+                if not encryption_key_result:
+                    logger.warning(f"No encryption key found for user ID: {user_id}")
+                    return []
+                
+                encrypted_key = bytes(encryption_key_result[0])
+                
+                # Then get the scan record
                 cur.execute("SELECT id, scan_time, detected_text FROM scan_history WHERE id = %s;", (record_id,))
                 scan = cur.fetchone()
-                decrypted_scan = [(scan[0], scan[1], decrypt_data(user_id, scan[2]))]
+                
+                if not scan:
+                    logger.warning(f"No scan found with ID: {record_id}")
+                    return []
+                
+                decrypted_scan = [(scan[0], scan[1], decrypt_data(encrypted_key, scan[2]))]
                 return decrypted_scan
         except Exception as e:
             logger.error(f"Error fetching scan history: {e}")
         finally:
             conn.close()
+    return []
 
 
 def create_session_table():
