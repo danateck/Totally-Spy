@@ -617,9 +617,18 @@ def get_scan_history(username: str) -> list[tuple[int, str, str]]:
                 if user_id_result:
                     user_id = user_id_result[0]  # Extract user_id from the result
                     # Fetch the scan history for the user, including the name column
-                    cur.execute("SELECT id, scan_time, detected_text, name FROM scan_history WHERE user_id = %s;", (user_id,))
+                    cur.execute("""
+                        SELECT id, scan_time, detected_text, name 
+                        FROM scan_history 
+                        WHERE user_id = %s;
+                    """, (user_id,))
                     scans = cur.fetchall()
-                    decrypted_scans = [(scan[0], scan[1], scan[3]) for scan in scans]  # Use scan[3] for name
+                    # Filter out records with empty decrypted data
+                    decrypted_scans = []
+                    for scan in scans:
+                        decrypted_text = decrypt_data(user_id, scan[2])
+                        if decrypted_text and decrypted_text.strip():  # Check if decrypted text exists and is not just whitespace
+                            decrypted_scans.append((scan[0], scan[1], scan[3]))  # Use scan[3] for name
                     return decrypted_scans
                 else:
                     logger.warning("No user found")
