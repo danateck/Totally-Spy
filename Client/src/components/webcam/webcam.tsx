@@ -193,22 +193,37 @@ const WebcamCapture: React.FC<{
       return;
     }
     
-    // Set canvas dimensions to match video's actual dimensions
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
+    // Calculate target dimensions while maintaining aspect ratio
+    const maxDimension = 2000; // Maximum width or height
+    let targetWidth = video.videoWidth;
+    let targetHeight = video.videoHeight;
+    
+    if (targetWidth > maxDimension || targetHeight > maxDimension) {
+      if (targetWidth > targetHeight) {
+        targetHeight = Math.round((targetHeight * maxDimension) / targetWidth);
+        targetWidth = maxDimension;
+      } else {
+        targetWidth = Math.round((targetWidth * maxDimension) / targetHeight);
+        targetHeight = maxDimension;
+      }
+    }
+    
+    // Set canvas dimensions to target size
+    canvas.width = targetWidth;
+    canvas.height = targetHeight;
     
     // Enable image smoothing for better quality
     ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = 'high';
     
-    // Draw the video frame at full resolution
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    // Draw the video frame at target size
+    ctx.drawImage(video, 0, 0, targetWidth, targetHeight);
     
     // Process the image with all enhancements
     processImage(
       ctx,
-      canvas.width,
-      canvas.height,
+      targetWidth,
+      targetHeight,
       quality,
       sharpness,
       enhancementLevel,
