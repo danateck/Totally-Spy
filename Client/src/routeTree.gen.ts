@@ -18,6 +18,7 @@ import { Route as ProfileIndexImport } from './routes/profile/index'
 import { Route as LoginIndexImport } from './routes/login/index'
 import { Route as HistoryIndexImport } from './routes/history/index'
 import { Route as DashboardIndexImport } from './routes/dashboard/index'
+import { Route as PortfolioIdImport } from './routes/portfolio/$id'
 import { Route as HistoryItemImport } from './routes/history/$item'
 
 // Create/Update Routes
@@ -64,6 +65,12 @@ const DashboardIndexRoute = DashboardIndexImport.update({
   getParentRoute: () => rootRoute,
 } as any)
 
+const PortfolioIdRoute = PortfolioIdImport.update({
+  id: '/portfolio/$id',
+  path: '/portfolio/$id',
+  getParentRoute: () => rootRoute,
+} as any)
+
 const HistoryItemRoute = HistoryItemImport.update({
   id: '/history/$item',
   path: '/history/$item',
@@ -86,6 +93,13 @@ declare module '@tanstack/react-router' {
       path: '/history/$item'
       fullPath: '/history/$item'
       preLoaderRoute: typeof HistoryItemImport
+      parentRoute: typeof rootRoute
+    }
+    '/portfolio/$id': {
+      id: '/portfolio/$id'
+      path: '/portfolio/$id'
+      fullPath: '/portfolio/$id'
+      preLoaderRoute: typeof PortfolioIdImport
       parentRoute: typeof rootRoute
     }
     '/dashboard/': {
@@ -138,6 +152,7 @@ declare module '@tanstack/react-router' {
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/history/$item': typeof HistoryItemRoute
+  '/portfolio/$id': typeof PortfolioIdRoute
   '/dashboard': typeof DashboardIndexRoute
   '/history': typeof HistoryIndexRoute
   '/login': typeof LoginIndexRoute
@@ -149,6 +164,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/history/$item': typeof HistoryItemRoute
+  '/portfolio/$id': typeof PortfolioIdRoute
   '/dashboard': typeof DashboardIndexRoute
   '/history': typeof HistoryIndexRoute
   '/login': typeof LoginIndexRoute
@@ -161,6 +177,7 @@ export interface FileRoutesById {
   __root__: typeof rootRoute
   '/': typeof IndexRoute
   '/history/$item': typeof HistoryItemRoute
+  '/portfolio/$id': typeof PortfolioIdRoute
   '/dashboard/': typeof DashboardIndexRoute
   '/history/': typeof HistoryIndexRoute
   '/login/': typeof LoginIndexRoute
@@ -174,6 +191,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/history/$item'
+    | '/portfolio/$id'
     | '/dashboard'
     | '/history'
     | '/login'
@@ -184,6 +202,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/history/$item'
+    | '/portfolio/$id'
     | '/dashboard'
     | '/history'
     | '/login'
@@ -194,6 +213,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/history/$item'
+    | '/portfolio/$id'
     | '/dashboard/'
     | '/history/'
     | '/login/'
@@ -206,6 +226,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   HistoryItemRoute: typeof HistoryItemRoute
+  PortfolioIdRoute: typeof PortfolioIdRoute
   DashboardIndexRoute: typeof DashboardIndexRoute
   HistoryIndexRoute: typeof HistoryIndexRoute
   LoginIndexRoute: typeof LoginIndexRoute
@@ -217,6 +238,7 @@ export interface RootRouteChildren {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   HistoryItemRoute: HistoryItemRoute,
+  PortfolioIdRoute: PortfolioIdRoute,
   DashboardIndexRoute: DashboardIndexRoute,
   HistoryIndexRoute: HistoryIndexRoute,
   LoginIndexRoute: LoginIndexRoute,
@@ -237,6 +259,7 @@ export const routeTree = rootRoute
       "children": [
         "/",
         "/history/$item",
+        "/portfolio/$id",
         "/dashboard/",
         "/history/",
         "/login/",
@@ -250,6 +273,9 @@ export const routeTree = rootRoute
     },
     "/history/$item": {
       "filePath": "history/$item.tsx"
+    },
+    "/portfolio/$id": {
+      "filePath": "portfolio/$id.tsx"
     },
     "/dashboard/": {
       "filePath": "dashboard/index.tsx"

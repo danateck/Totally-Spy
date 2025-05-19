@@ -7,6 +7,7 @@ import binascii
 from fastapi import HTTPException
 import logging
 from typing import Optional
+from datetime import datetime
 
 from pydantic import BaseModel
 
@@ -82,10 +83,13 @@ def create_scan_history_table():
                         id SERIAL PRIMARY KEY,
                         user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
                         scan_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                        detected_text TEXT NOT NULL
+                        detected_text TEXT NOT NULL,
+                        name TEXT
                     );
                 """)
                 conn.commit()
+                # Ensure all columns exist
+                ensure_scan_history_columns()
         except Exception as e:
             logger.error(f"Error creating table: {e}")
         finally:
@@ -260,7 +264,7 @@ def get_encrypted_scans_from_portfolio(portfolio_id: int) -> list[tuple[int, str
     try:
         with conn.cursor() as cur:
             cur.execute("""
-                SELECT sh.id, sh.scan_time, sh.detected_text, ps.added_by_user_id
+                SELECT sh.id, sh.scan_time, sh.detected_text, ps.added_by_user_id, sh.name
                 FROM portfolio_scans ps
                 JOIN scan_history sh ON ps.scan_id = sh.id
                 WHERE ps.portfolio_id = %s
@@ -280,9 +284,9 @@ def get_scans_in_portfolio(user_id: int, portfolio_id: int) -> list[tuple[int, s
 
     encrypted_scans = get_encrypted_scans_from_portfolio(portfolio_id)
     decrypted_scans = []
-    for scan_id, scan_time, encrypted_text, added_by_user_id in encrypted_scans:
+    for scan_id, scan_time, encrypted_text, added_by_user_id, name in encrypted_scans:
         decrypted_text = decrypt_data(added_by_user_id, encrypted_text)
-        decrypted_scans.append((scan_id, scan_time, decrypted_text))
+        decrypted_scans.append((scan_id, scan_time, name))
 
     return decrypted_scans
 
@@ -380,16 +384,18 @@ def delete_portfolio(portfolio_id: int, requesting_user_id: int) -> bool:
     raise RuntimeError("Database connection failed.")
 
 # get all the members of the portfolio
-def get_portfolio_members(portfolio_id: int) -> list[tuple[int, str]]:
+def get_portfolio_members(portfolio_id: int) -> list[tuple[str, str]]:
     conn = get_db_connection()
     members = []
     if conn:
         try:
             with conn.cursor() as cur:
-                cur.execute(
-                    "SELECT user_id, role FROM portfolio_members WHERE portfolio_id = %s;",
-                    (portfolio_id,)
-                )
+                cur.execute("""
+                    SELECT u.username, pm.role 
+                    FROM portfolio_members pm
+                    JOIN users u ON pm.user_id = u.id
+                    WHERE pm.portfolio_id = %s;
+                """, (portfolio_id,))
                 members = cur.fetchall()
         except Exception as e:
             logger.error(f"Error getting portfolio members: {e}")
@@ -525,9 +531,13 @@ def insert_scan(username: str, detected_text: str) -> None:
                     logger.warning("Encryption failed!")
                     return
                 
+                # Create a default name with formatted date (e.g., "21 Apr 2025 07:46 Recording")
+                current_time = datetime.now()
+                default_name = f"{current_time.strftime('%d %b %Y %H:%M')} Recording"
+                
                 cur.execute(
-                    "INSERT INTO scan_history (user_id, detected_text) VALUES (%s, %s);",
-                    (user_id, encrypted_text)
+                    "INSERT INTO scan_history (user_id, detected_text, name) VALUES (%s, %s, %s);",
+                    (user_id, encrypted_text, default_name)
                 )
                 conn.commit()
                 logger.info(f"Scan history added successfully!")
@@ -606,10 +616,10 @@ def get_scan_history(username: str) -> list[tuple[int, str, str]]:
                 user_id_result = cur.fetchone()
                 if user_id_result:
                     user_id = user_id_result[0]  # Extract user_id from the result
-                    # Fetch the scan history for the user
-                    cur.execute("SELECT id, scan_time, detected_text FROM scan_history WHERE user_id = %s;", (user_id,))
+                    # Fetch the scan history for the user, including the name column
+                    cur.execute("SELECT id, scan_time, detected_text, name FROM scan_history WHERE user_id = %s;", (user_id,))
                     scans = cur.fetchall()
-                    decrypted_scans = [(scan[0], scan[1], decrypt_data(user_id, scan[2])) for scan in scans]
+                    decrypted_scans = [(scan[0], scan[1], scan[3]) for scan in scans]  # Use scan[3] for name
                     return decrypted_scans
                 else:
                     logger.warning("No user found")
@@ -739,3 +749,105 @@ def delete_record(record_id: str):
     finally:
         cur.close()
         conn.close()  
+
+def rename_portfolio(portfolio_id: int, new_name: str, requesting_user_id: int) -> bool:
+    role = get_user_role_in_portfolio(requesting_user_id, portfolio_id)
+    if role != 'owner':
+        logger.warning(f"User {requesting_user_id} attempted to rename portfolio {portfolio_id} without owner permission.")
+        raise PermissionError("Only the owner can rename this portfolio.")
+
+    conn = get_db_connection()
+    if conn:
+        try:
+            with conn.cursor() as cur:
+                cur.execute("UPDATE portfolios SET name = %s WHERE id = %s;", (new_name, portfolio_id))
+                conn.commit()
+                return cur.rowcount > 0
+        except Exception as e:
+            logger.error(f"Error renaming portfolio: {e}")
+            raise
+        finally:
+            conn.close()
+    raise RuntimeError("Database connection failed.")  
+
+def update_scan_name(scan_id: int, user_id: int, new_name: str) -> bool:
+    """
+    Rename a scan if it belongs to the specified user.
+    Returns True if successful, False otherwise.
+    """
+    conn = get_db_connection()
+    if not conn:
+        logger.error("Failed to connect to database")
+        return False
+
+    try:
+        with conn.cursor() as cur:
+            # Check if the scan belongs to the user
+            cur.execute("SELECT user_id FROM scan_history WHERE id = %s;", (scan_id,))
+            result = cur.fetchone()
+            if not result:
+                logger.warning(f"Scan {scan_id} not found")
+                return False
+            if result[0] != user_id:
+                logger.warning(f"User {user_id} attempted to rename scan {scan_id} without permission")
+                return False
+
+            # Update the scan name
+            cur.execute("UPDATE scan_history SET name = %s WHERE id = %s;", (new_name, scan_id))
+            conn.commit()
+            return True
+    except Exception as e:
+        logger.error(f"Error renaming scan: {e}")
+        return False
+    finally:
+        conn.close()  
+
+def ensure_scan_history_columns():
+    """Ensure all required columns exist in the scan_history table."""
+    conn = get_db_connection()
+    if conn:
+        try:
+            with conn.cursor() as cur:
+                # Check if name column exists
+                cur.execute("""
+                    SELECT column_name 
+                    FROM information_schema.columns 
+                    WHERE table_name = 'scan_history' AND column_name = 'name';
+                """)
+                if not cur.fetchone():
+                    # Add name column if it doesn't exist
+                    cur.execute("""
+                        ALTER TABLE scan_history 
+                        ADD COLUMN name TEXT;
+                    """)
+                    # Update existing rows with default names based on scan_time
+                    cur.execute("""
+                        UPDATE scan_history 
+                        SET name = scan_time::text 
+                        WHERE name IS NULL;
+                    """)
+                    conn.commit()
+                    logger.info("Added name column to scan_history table")
+        except Exception as e:
+            logger.error(f"Error ensuring scan_history columns: {e}")
+        finally:
+            conn.close()
+
+def update_existing_scan_names():
+    """Update existing scan names to use the new format."""
+    conn = get_db_connection()
+    if conn:
+        try:
+            with conn.cursor() as cur:
+                # Update all scan names that are in the old format
+                cur.execute("""
+                    UPDATE scan_history 
+                    SET name = TO_CHAR(scan_time, 'DD Mon YYYY HH24:MI') || ' Recording'
+                    WHERE name NOT LIKE '% Recording';
+                """)
+                conn.commit()
+                logger.info("Updated existing scan names to new format")
+        except Exception as e:
+            logger.error(f"Error updating scan names: {e}")
+        finally:
+            conn.close()
