@@ -28,7 +28,6 @@ function RouteComponent() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [filterText, setFilterText] = useState('')
-  const [selectedScan, setSelectedScan] = useState<number | null>(null)
   const [showAddToPortfolioModal, setShowAddToPortfolioModal] = useState(false)
   const [selectedScanForPortfolio, setSelectedScanForPortfolio] = useState<number | null>(null)
   const [portfolios, setPortfolios] = useState<Portfolio[]>([])
@@ -356,7 +355,6 @@ function RouteComponent() {
         <PortfolioList
           portfolios={portfolios}
           onCreate={() => setShowCreatePortfolioModal(true)}
-          onSelectPortfolio={id => setSelectedPortfolio(id)}
         />
 
         {/* Recordings Section */}

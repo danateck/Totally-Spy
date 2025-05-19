@@ -9,10 +9,9 @@ interface Portfolio {
 interface PortfolioListProps {
   portfolios: Portfolio[]
   onCreate: () => void
-  onSelectPortfolio: (id: number) => void
 }
 
-export function PortfolioList({ portfolios, onCreate, onSelectPortfolio }: PortfolioListProps) {
+export function PortfolioList({ portfolios, onCreate }: PortfolioListProps) {
   return (
     <div className="mb-10">
       <div className="flex items-center justify-between mb-4">
