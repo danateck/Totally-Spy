@@ -126,27 +126,56 @@ def decode_base64_frame(base64_frame):
 
 @app.post("/record/img")
 async def search_info(image_data: ImageData, user: User = Depends(get_current_user)):
+    try:
+        # Check base64 string length (rough estimate of image size)
+        # Base64 increases size by ~33%, so 3MB base64 string ≈ 2MB actual image
+        if len(image_data.image) > 3_000_000:  # ~3MB base64 string
+            raise HTTPException(
+                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                detail="Image too large. Maximum size is approximately 2MB"
+            )
+
         # Decode the base64 frame into ndarray (OpenCV-compatible image)
-        frame = decode_base64_frame(image_data.image)
+        try:
+            frame = decode_base64_frame(image_data.image)
+        except Exception as e:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid image data"
+            )
     
         # Process the frame to extract text and detect relevant data (e.g., OTP)
-        
-        cord_cropped_image = detector.find_cord_for_phones(frame)
-        cropped_image = get_phones_from_cords(frame, find_largest_phone_from_cords(cord_cropped_image))
-        if len(cropped_image) > 0:
-            cropped_image = cropped_image[0]
-        else:
-            raise HTTPException(status_code=201, detail="No phone found.")
-        enhanced_image = enhance_image(cropped_image)
-        extracted_text = ocr_manager.extract_text(enhanced_image)
-        detected_data = classify_text(extracted_text[0])
-        str_data = convert_to_formatted_string(detected_data) 
+        try:
+            cord_cropped_image = detector.find_cord_for_phones(frame)
+            cropped_image = get_phones_from_cords(frame, find_largest_phone_from_cords(cord_cropped_image))
+            if len(cropped_image) > 0:
+                cropped_image = cropped_image[0]
+            else:
+                raise HTTPException(status_code=201, detail="No phone found.")
+            enhanced_image = enhance_image(cropped_image)
+            extracted_text = ocr_manager.extract_text(enhanced_image)
+            detected_data = classify_text(extracted_text[0])
+            str_data = convert_to_formatted_string(detected_data) 
 
-        if detected_data:
-            insert_scan(user.username, str_data)
-            return {"message": detected_data}
-        else:
-            raise HTTPException(status_code=202, detail="No data found.")
+            if detected_data:
+                insert_scan(user.username, str_data)
+                return {"message": detected_data}
+            else:
+                raise HTTPException(status_code=202, detail="No data found.")
+        except HTTPException as he:
+            raise he
+        except Exception as e:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Error processing image"
+            )
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Server error"
+        )
 
 
 @app.post("/auth/login")
