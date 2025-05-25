@@ -3,6 +3,8 @@ import Webcam from "react-webcam";
 import { ZoomIn, ZoomOut, Maximize, Minimize, Focus, Settings, RotateCcw, Camera, RefreshCw } from "lucide-react";
 import { getFilterStyle, processImage } from "@/lib/image-processing";
 import type { QualityLevel } from "@/lib/image-processing";
+import { getTopImages } from "@/lib/getTopImages";
+import { CAMERA_CONFIG } from "@/config/camera";
 
 // No need for custom interface as we're using 'any' type for constraints
 // to bypass TypeScript limitations with the browser APIs
@@ -20,6 +22,11 @@ const WebcamCapture: React.FC<{
   const mediaStreamRef = useRef<MediaStream | null>(null);
   const processedImageRef = useRef<string | null>(null);
   const lastCaptureTimeRef = useRef<number>(0);
+
+  // Add new refs for image capture and scoring
+  const capturedImagesRef = useRef<HTMLImageElement[]>([]);
+  const captureIntervalRef = useRef<number | undefined>(undefined);
+  const sendIntervalRef = useRef<number | undefined>(undefined);
 
   // Connect webcam ref to video element for processing
   useEffect(() => {
@@ -175,15 +182,15 @@ const WebcamCapture: React.FC<{
     return getFilterStyle(quality, sharpness, enhancementLevel);
   }, [quality, sharpness, enhancementLevel]);
 
-  // Enhanced capture with post-processing for quality
-  const capture = useCallback(() => {
+  // Function to capture and score an image
+  const captureAndScoreImage = useCallback(() => {
     if (!webcamRef.current || !canvasRef.current || !videoRef.current) return;
     
     const video = videoRef.current;
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d', { 
       alpha: false,
-      willReadFrequently: true  // Add this for better performance when reading canvas data
+      willReadFrequently: true
     });
     if (!ctx) return;
 
@@ -194,7 +201,7 @@ const WebcamCapture: React.FC<{
     }
     
     // Calculate target dimensions while maintaining aspect ratio
-    const maxDimension = 2000; // Maximum width or height
+    const maxDimension = CAMERA_CONFIG.MAX_IMAGE_DIMENSION;
     let targetWidth = video.videoWidth;
     let targetHeight = video.videoHeight;
     
@@ -208,18 +215,18 @@ const WebcamCapture: React.FC<{
       }
     }
     
-    // Set canvas dimensions to target size
+    // Set canvas dimensions
     canvas.width = targetWidth;
     canvas.height = targetHeight;
     
-    // Enable image smoothing for better quality
+    // Enable image smoothing
     ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = 'high';
     
-    // Draw the video frame at target size
+    // Draw the video frame
     ctx.drawImage(video, 0, 0, targetWidth, targetHeight);
     
-    // Process the image with all enhancements
+    // Process the image with enhancements
     processImage(
       ctx,
       targetWidth,
@@ -232,11 +239,71 @@ const WebcamCapture: React.FC<{
       opticalZoomSupported
     );
     
-    // Get the enhanced image with good quality from the processed context
-    const imageSrc = canvas.toDataURL('image/jpeg', 0.95);
-    processedImageRef.current = imageSrc;
+    // Create a new image element and set its source
+    const img = new Image();
+    img.src = canvas.toDataURL('image/jpeg', CAMERA_CONFIG.JPEG_QUALITY);
+    
+    // Add to captured images array
+    capturedImagesRef.current.push(img);
+    
+    // Keep only the last N images to prevent memory issues
+    if (capturedImagesRef.current.length > CAMERA_CONFIG.MAX_STORED_IMAGES) {
+      capturedImagesRef.current.shift();
+    }
   }, [webcamRef, canvasRef, videoRef, quality, sharpness, enhancementLevel, zoomLevel, position, opticalZoomSupported]);
-  
+
+  // Function to send top images
+  const sendTopImages = useCallback(() => {
+    if (!onCapture || capturedImagesRef.current.length === 0) return;
+
+    // Wait for all images to load
+    const loadedImages = capturedImagesRef.current.filter(img => img.complete);
+    if (loadedImages.length === 0) return;
+
+    // Get top N images using the scoring function
+    const topImages = getTopImages(loadedImages, CAMERA_CONFIG.TOP_IMAGES_TO_SEND);
+    
+    // Send each top image
+    topImages.forEach((img: HTMLImageElement) => {
+      if (onCapture) {
+        onCapture(img.src);
+      }
+    });
+
+    // Clear the captured images array
+    capturedImagesRef.current = [];
+  }, [onCapture]);
+
+  // Handle recording interval
+  useEffect(() => {
+    if (isRecording) {
+      // Start capturing images at configured interval
+      captureIntervalRef.current = window.setInterval(captureAndScoreImage, CAMERA_CONFIG.CAPTURE_INTERVAL_MS);
+      
+      // Start sending top images at configured interval
+      sendIntervalRef.current = window.setInterval(sendTopImages, CAMERA_CONFIG.SEND_INTERVAL_MS);
+    } else {
+      // Clear intervals
+      if (captureIntervalRef.current) {
+        window.clearInterval(captureIntervalRef.current);
+      }
+      if (sendIntervalRef.current) {
+        window.clearInterval(sendIntervalRef.current);
+      }
+      // Clear captured images
+      capturedImagesRef.current = [];
+    }
+
+    return () => {
+      if (captureIntervalRef.current) {
+        window.clearInterval(captureIntervalRef.current);
+      }
+      if (sendIntervalRef.current) {
+        window.clearInterval(sendIntervalRef.current);
+      }
+    };
+  }, [isRecording, captureAndScoreImage, sendTopImages]);
+
   // Handle zooming in with limits
   const handleZoomIn = () => {
     const newZoom = Math.min(zoomLevel + 0.25, opticalZoomSupported ? maxOpticalZoom : 4);
@@ -344,52 +411,6 @@ const WebcamCapture: React.FC<{
   const handleMouseUp = () => {
     setIsDragging(false);
   };
-
-  // Handle recording interval
-  useEffect(() => {
-    if (isRecording) {
-      // Capture immediately when recording starts
-      capture();
-      
-      intervalRef.current = window.setInterval(() => {
-        const now = Date.now();
-        // Capture and send image every 750ms
-        capture();
-        if (processedImageRef.current && onCapture) {
-          onCapture(processedImageRef.current);
-          lastCaptureTimeRef.current = now;
-        }
-      }, 750);
-    } else {
-      if (intervalRef.current) {
-        window.clearInterval(intervalRef.current);
-      }
-      processedImageRef.current = null;
-    }
-
-    return () => {
-      if (intervalRef.current) {
-        window.clearInterval(intervalRef.current);
-      }
-    };
-  }, [isRecording, capture, onCapture]);
-
-  // Add event listeners for mouse movements outside the component
-  useEffect(() => {
-    const handleGlobalMouseUp = () => {
-      setIsDragging(false);
-    };
-    
-    if (isDragging) {
-      window.addEventListener('mouseup', handleGlobalMouseUp);
-      window.addEventListener('mouseleave', handleGlobalMouseUp);
-    }
-    
-    return () => {
-      window.removeEventListener('mouseup', handleGlobalMouseUp);
-      window.removeEventListener('mouseleave', handleGlobalMouseUp);
-    };
-  }, [isDragging]);
 
   // Toggle autofocus
   const toggleAutoFocus = () => {

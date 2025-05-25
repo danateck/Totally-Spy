@@ -1,9 +1,9 @@
 // Calculating sharpness using a Laplacian
-function calculateSharpnessLaplacian(imageData, width, height) {
+function calculateSharpnessLaplacian(imageData: ImageData, width: number, height: number): number {
     const data = imageData.data;
     let total = 0;
 
-    const getGray = (x, y) => {
+    const getGray = (x: number, y: number): number => {
         const i = (y * width + x) * 4;
         return 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
     };
@@ -23,7 +23,7 @@ function calculateSharpnessLaplacian(imageData, width, height) {
 }
 
 // Calculating contrast using standard deviation of grayscale
-function calculateContrast(imageData) {
+function calculateContrast(imageData: ImageData): number {
     const data = imageData.data;
     let sum = 0, sumSq = 0, n = data.length / 4;
 
@@ -39,7 +39,7 @@ function calculateContrast(imageData) {
 }
 
 // Calculating colorfulness using the difference between channels
-function calculateColorfulness(imageData) {
+function calculateColorfulness(imageData: ImageData): number {
     const data = imageData.data;
     let rgSum = 0, ybSum = 0;
     let rgMean = 0, ybMean = 0;
@@ -63,7 +63,7 @@ function calculateColorfulness(imageData) {
 }
 
 // Combining sharpness, contrast, and colorfulness for a single score
-function scoreImage(imageData, width, height) {
+function scoreImage(imageData: ImageData, width: number, height: number): number {
     const sharpness = calculateSharpnessLaplacian(imageData, width, height);
     const contrast = calculateContrast(imageData);
     const colorfulness = calculateColorfulness(imageData);
@@ -72,10 +72,12 @@ function scoreImage(imageData, width, height) {
 }
 
 // Getting the N images with the highest score
-function getTopImages(imageElements, topN = 3) {
+export function getTopImages(imageElements: HTMLImageElement[], topN: number = 3): HTMLImageElement[] {
     const canvas = document.createElement("canvas");
-    const ctx = canvas.getContext("2d");
-    const scored = [];
+    const ctx = canvas.getContext("2d", { willReadFrequently: true });
+    if (!ctx) return [];
+    
+    const scored: { img: HTMLImageElement; score: number }[] = [];
 
     for (const img of imageElements) {
         canvas.width = img.width;
@@ -88,4 +90,4 @@ function getTopImages(imageElements, topN = 3) {
 
     scored.sort((a, b) => b.score - a.score);
     return scored.slice(0, topN).map(s => s.img);
-}
+} 

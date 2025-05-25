@@ -41,9 +41,14 @@ function RouteComponent() {
 
       if (!response.ok) {
         console.error('Failed to send image to server');
-      } else if (data.message.length > 0 && !data.message[0].includes('No')) {
-        setAlertTitle(data.message[0] || 'Success');
-        setAlertMessage(data.message[1] || 'Code found!');
+      } else if (
+        data.message &&
+        Array.isArray(data.message) &&
+        data.message.length > 0 &&
+        !data.message[0].includes('No')
+      ) {
+        setAlertTitle('Code found!');
+        setAlertMessage(data.message.join(' - '));
         setShowAlert(true);
       }
     } catch (error) {
@@ -62,7 +67,33 @@ function RouteComponent() {
             {showAlert && (
               <Alert className="w-full max-w-2xl border border-green-500/20 bg-green-500/10">
                 <AlertTitle className="text-green-400">{alertTitle}</AlertTitle>
-                <AlertDescription className="text-green-400">{alertMessage}</AlertDescription>
+                <AlertDescription className="text-green-400">
+                  {(() => {
+                    if (typeof alertMessage !== 'string' || !alertMessage.trim()) return null;
+                    // Split by ' - ' to get each pair
+                    const rawPairs = alertMessage.split(' - ').map(s => s.trim()).filter(Boolean);
+                    // Parse each pair into [value, type]
+                    const pairs = rawPairs.map(pair => {
+                      const lastComma = pair.lastIndexOf(',');
+                      if (lastComma === -1) return [pair, ''];
+                      return [pair.slice(0, lastComma), pair.slice(lastComma + 1)];
+                    });
+                    // Remove POTENTIALLY_SENSITIVE if a duplicate value exists with a different type
+                    const seen = new Map();
+                    for (const [found, type] of pairs) {
+                      if (!seen.has(found)) {
+                        seen.set(found, type);
+                      } else if (type !== "POTENTIALLY_SENSITIVE") {
+                        seen.set(found, type); // Prefer non-sensitive type
+                      }
+                    }
+                    return Array.from(seen.entries()).map(([found, type], idx) => (
+                      <div key={idx}>
+                        <b>{found}</b>: {type}
+                      </div>
+                    ));
+                  })()}
+                </AlertDescription>
               </Alert>
             )}
 
