@@ -256,7 +256,7 @@ def has_access_to_portfolio(user_id: int, portfolio_id: int) -> bool:
         conn.close()
 
 # 2. Get all scans in the portfolio with encrypted data
-def get_encrypted_scans_from_portfolio(portfolio_id: int) -> list[tuple[int, str, str, int]]:
+def get_encrypted_scans_from_portfolio(portfolio_id: int) -> list[tuple[int, str, str, int, str]]:
     conn = get_db_connection()
     scans = []
     if not conn:
@@ -286,7 +286,7 @@ def get_scans_in_portfolio(user_id: int, portfolio_id: int) -> list[tuple[int, s
     decrypted_scans = []
     for scan_id, scan_time, encrypted_text, added_by_user_id, name in encrypted_scans:
         decrypted_text = decrypt_data(added_by_user_id, encrypted_text)
-        decrypted_scans.append((scan_id, scan_time, name))
+        decrypted_scans.append((scan_id, scan_time, name, decrypted_text))
 
     return decrypted_scans
 
