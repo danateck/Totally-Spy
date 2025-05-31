@@ -15,12 +15,16 @@ patterns = {
 
     # New address detection
     "ADDRESS_HEBREW": re.compile(
-        r"(?:רחוב|שדרות|דרך|כיכר)\s+[א-ת\"'\-\s]+\s+\d{1,4}(?:[,]\s*[א-ת\"'\-\s]+)?"
+        r"(?:רחוב|שדרות|דרך|כיכר)\s+[א-ת\"'\-]{2,}(?:\s+[א-ת\"'\-]{2,}){0,2}\s+\d{1,4}(?=[\s,]|$)"
     ),
+
     "ADDRESS_ENGLISH": re.compile(
-        r"\b\d{1,5}\s+(?:[A-Z][a-z]*\s){1,3}(?:St|Street|Ave|Avenue|Rd|Road|Blvd|Boulevard|Lane|Ln|Dr|Drive|Ct|Court)\b(?:,\s*\w+)*"
+    r"(?:\b(?:Apartment|Apt|Unit|Suite)\s*\d+[A-Za-z]?\s*,\s*)?"       
+    r"\b\d+[A-Za-z]?\s+(?:[A-Z][a-z]+(?:\s|$)){1,3}"                     
+    r"(?:St|Street|Ave|Avenue|Rd|Road|Blvd|Boulevard|Lane|Ln|Dr|Drive|Ct|Court)\b"
     ),
 }
+
 
 def classify_text(text: str) -> list[tuple[str, str]]:
     detected = []
