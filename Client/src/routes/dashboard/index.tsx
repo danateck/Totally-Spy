@@ -32,7 +32,8 @@ function DashboardComponent() {
   return (
     <div
       className="min-h-screen bg-background text-foreground relative"
-      style={{ backgroundImage: "url('/images/background.jpg')" }}
+      style={{ backgroundColor: "black" }}
+
     >
       {/* Sign Out Button in top-left corner */}
       <div className="absolute top-4 left-4">
