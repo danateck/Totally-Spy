@@ -23,6 +23,26 @@ export const Route = createFileRoute('/portfolio/$id')({
 
 function PortfolioComponent() {
   const { id } = Route.useParams()
+
+
+  if (!id || isNaN(Number(id))) {
+    return (
+      <div className="min-h-screen bg-background text-foreground">
+        <div className="max-w-2xl mx-auto py-12 px-4">
+          <Logo className="mb-12" />
+          <div className="text-center">
+            <h1 className="text-2xl font-bold text-red-500 mb-4">Invalid Portfolio</h1>
+            <p>The portfolio ID is invalid or missing.</p>
+            <Link to="/history" className="text-primary hover:underline">
+              ← Back to History
+            </Link>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+
   const navigate = useNavigate()
   const [portfolio, setPortfolio] = useState<{ name: string; role: string } | null>(null)
   const [scans, setScans] = useState<Scan[]>([])
@@ -52,6 +72,7 @@ function PortfolioComponent() {
     setShowAddScanModal(false)
   }
 
+  
   const fetchPortfolioData = async () => {
     setLoading(true)
     try {
@@ -73,6 +94,7 @@ function PortfolioComponent() {
       console.log('Portfolio data:', portfolioData)
 
       // Fetch portfolio scans
+      console.log('Fetching scans for portfolio:', id)
       const scansResponse = await fetch(`/portfolio/${id}/scans`, {
         credentials: 'include',
         headers: {
@@ -86,15 +108,38 @@ function PortfolioComponent() {
         throw new Error(errorData.detail || 'Failed to fetch portfolio scans')
       }
       const scansData = await scansResponse.json()
+      console.log('Raw scans data from portfolio endpoint:', scansData)
 
       // Transform scans data from array format to object format
-      const transformedScans = scansData.scans.map(([id, date, name]: [number, string, string]) => ({
-        id,
-        name,
-        date
-      }))
+      const transformedScans = scansData.scans.map(([id, date, name]: [number, string, string]) => {
+  // If the name looks like encrypted text (long and contains only letters/numbers)
+      const isEncrypted = name.length > 50 && /^[0-9a-fA-F]+$/.test(name);
+      
+        return {
+          id,
+          name: isEncrypted ? `Shared Scan #${id}` : name,
+          date
+        }
+      })
+      console.log('Transformed scans for ScanDetails:', transformedScans)
 
-      // Fetch portfolio members
+      // Compare with regular recordings - let's also fetch from the regular endpoint to compare
+      try {
+        const regularResponse = await fetch('/portfolio/overview', {
+          credentials: 'include'
+        })
+        if (regularResponse.ok) {
+          const regularData = await regularResponse.json()
+          console.log('Regular recordings data structure:', regularData)
+          console.log('Comparing scan 744 data:')
+          console.log('- Portfolio scan 744:', transformedScans.find((s: Scan) => s.id === 744))
+          console.log('- Regular recordings scan 744:', regularData.recordings?.find((r: any) => r.id === 744))
+        }
+      } catch (e) {
+        console.log('Could not fetch regular recordings for comparison')
+      }
+
+      // Rest of your existing code...
       const membersResponse = await fetch(`/portfolio/${id}/members`, {
         credentials: 'include',
         headers: {
@@ -109,7 +154,6 @@ function PortfolioComponent() {
       }
       const membersData = await membersResponse.json()
 
-      // Transform members data from array format to object format
       const transformedMembers = membersData.members.map(([username, role]: [string, string]) => ({
         username,
         role
@@ -141,8 +185,13 @@ function PortfolioComponent() {
   }
 
   useEffect(() => {
+  if (id && !isNaN(Number(id))) {
     fetchPortfolioData()
-  }, [id])
+  } else {
+    setError('Invalid portfolio ID')
+    setLoading(false)
+  }
+}, [id])
 
   const handleAddMember = async () => {
     if (!newMemberUsername.trim()) return
@@ -516,7 +565,19 @@ function PortfolioComponent() {
 
         {/* Records Section */}
         <div>
-          <h2 className="text-xl font-semibold mb-4">Records</h2>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-semibold">Records</h2>
+            <button
+              onClick={() => fetchPortfolioData()}
+              disabled={loading}
+              className="px-4 py-2 bg-green-600 text-black rounded-lg font-semibold hover:bg-green-700 transition-colors flex items-center"
+            >
+              <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+              Refresh
+            </button>
+          </div>
           {scans.length === 0 ? (
             <div className="text-center py-8 bg-card rounded-xl border border-border">
               <p className="text-muted-foreground text-lg">No records found in this portfolio</p>
