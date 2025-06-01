@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import Webcam from "react-webcam";
 import { ZoomIn, ZoomOut, Maximize, Minimize, Focus, Settings, RotateCcw, Camera, RefreshCw } from "lucide-react";
+import { getFilterStyle, processImage } from "@/lib/image-processing";
+import type { QualityLevel } from "@/lib/image-processing";
 
 // No need for custom interface as we're using 'any' type for constraints
 // to bypass TypeScript limitations with the browser APIs
@@ -8,7 +10,7 @@ import { ZoomIn, ZoomOut, Maximize, Minimize, Focus, Settings, RotateCcw, Camera
 const WebcamCapture: React.FC<{
   onCapture?: (imageSrc: string) => void;
   isRecording: boolean;
-  initialQuality?: "standard" | "high" | "ultra"; // Quality presets
+  initialQuality?: QualityLevel;
 }> = ({ onCapture, isRecording, initialQuality = "high" }) => {
   const webcamRef = useRef<Webcam>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -16,6 +18,8 @@ const WebcamCapture: React.FC<{
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const intervalRef = useRef<number | undefined>(undefined);
   const mediaStreamRef = useRef<MediaStream | null>(null);
+  const processedImageRef = useRef<string | null>(null);
+  const lastCaptureTimeRef = useRef<number>(0);
 
   // Connect webcam ref to video element for processing
   useEffect(() => {
@@ -31,7 +35,7 @@ const WebcamCapture: React.FC<{
   const [showSettings, setShowSettings] = useState(false);
   
   // Camera state
-  const [facingMode, setFacingMode] = useState<"user" | "environment">("user");
+  const [facingMode, setFacingMode] = useState<"user" | "environment">("environment");
   const [availableCameras, setAvailableCameras] = useState<MediaDeviceInfo[]>([]);
   const [selectedCameraId, setSelectedCameraId] = useState<string>("");
   const [isLoadingCameras, setIsLoadingCameras] = useState(true);
@@ -44,7 +48,7 @@ const WebcamCapture: React.FC<{
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const [autoFocus, setAutoFocus] = useState(true);
-
+  
   // Get initial video constraints
   const getVideoConstraints = useCallback(() => {
     const constraints: any = {
@@ -82,7 +86,15 @@ const WebcamCapture: React.FC<{
       
       // If we found cameras and don't have one selected, pick the first
       if (videoDevices.length > 0 && !selectedCameraId) {
-        setSelectedCameraId(videoDevices[0].deviceId);
+        // Try to find the environment camera first
+        const environmentCamera = videoDevices.find(device => 
+          device.label.toLowerCase().includes('back') || 
+          device.label.toLowerCase().includes('rear') ||
+          device.label.toLowerCase().includes('environment')
+        );
+        
+        // If we found an environment camera, use it, otherwise use the first camera
+        setSelectedCameraId(environmentCamera?.deviceId || videoDevices[0].deviceId);
       }
     } catch (error) {
       console.error("Error accessing media devices:", error);
@@ -126,12 +138,6 @@ const WebcamCapture: React.FC<{
       }
     };
 
-    // Store media stream reference when available
-    const handleUserMedia = (stream: MediaStream) => {
-      mediaStreamRef.current = stream;
-      checkOpticalZoomCapability();
-    };
-
     if (webcamRef.current) {
       webcamRef.current.video?.addEventListener('loadedmetadata', () => checkOpticalZoomCapability());
     }
@@ -164,97 +170,73 @@ const WebcamCapture: React.FC<{
     }
   }, [mediaStreamRef.current, opticalZoomSupported]);
 
+  // Calculate filter values based on quality settings
+  const getFilterStyleForPreview = useCallback(() => {
+    return getFilterStyle(quality, sharpness, enhancementLevel);
+  }, [quality, sharpness, enhancementLevel]);
+
   // Enhanced capture with post-processing for quality
   const capture = useCallback(() => {
     if (!webcamRef.current || !canvasRef.current || !videoRef.current) return;
     
     const video = videoRef.current;
     const canvas = canvasRef.current;
-    const ctx = canvas.getContext('2d');
+    const ctx = canvas.getContext('2d', { 
+      alpha: false,
+      willReadFrequently: true  // Add this for better performance when reading canvas data
+    });
     if (!ctx) return;
-    
-    // Set canvas dimensions to match video
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    
-    // Draw the current frame from video to canvas
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-    
-    // Apply enhancement based on current settings
-    if (quality !== "standard") {
-      // Apply sharpening filter for enhanced clarity
-      applySharpening(ctx, canvas.width, canvas.height, sharpness);
-      
-      // Apply additional enhancements based on level
-      if (quality === "ultra") {
-        applyColorEnhancement(ctx, canvas.width, canvas.height, enhancementLevel);
-      }
-    }
-    
-    // Get the enhanced image
-    const imageSrc = canvas.toDataURL('image/jpeg', 0.95);
-    
-    if (imageSrc && onCapture) {
-      onCapture(imageSrc);
-    }
-  }, [webcamRef, canvasRef, videoRef, onCapture, quality, enhancementLevel, sharpness]);
-  
-  // Apply sharpening filter to enhance details
-  const applySharpening = (ctx: CanvasRenderingContext2D, width: number, height: number, intensity: number) => {
-    const imageData = ctx.getImageData(0, 0, width, height);
-    const data = imageData.data;
-    const factor = 0.25 * intensity;
-    const bias = 128 * (1 - factor);
-    
-    // Simple sharpening algorithm
-    const tempCanvas = document.createElement('canvas');
-    tempCanvas.width = width;
-    tempCanvas.height = height;
-    const tempCtx = tempCanvas.getContext('2d');
-    if (!tempCtx) return;
-    
-    tempCtx.drawImage(ctx.canvas, 0, 0);
-    const tempData = tempCtx.getImageData(0, 0, width, height).data;
-    
-    // Apply convolution filter
-    for (let y = 1; y < height - 1; y++) {
-      for (let x = 1; x < width - 1; x++) {
-        const pos = (y * width + x) * 4;
-        
-        for (let i = 0; i < 3; i++) {
-          const val = (
-            -tempData[pos - width * 4 + i] -
-            tempData[pos - 4 + i] +
-            9 * tempData[pos + i] -
-            tempData[pos + 4 + i] -
-            tempData[pos + width * 4 + i]
-          ) * factor + bias;
-          
-          data[pos + i] = Math.max(0, Math.min(255, val));
-        }
-      }
-    }
-    
-    ctx.putImageData(imageData, 0, 0);
-  };
-  
-  // Apply color enhancement
-  const applyColorEnhancement = (ctx: CanvasRenderingContext2D, width: number, height: number, level: number) => {
-    const imageData = ctx.getImageData(0, 0, width, height);
-    const data = imageData.data;
-    const contrast = 1 + (level * 0.1);
-    const brightness = level * 3;
-    
-    for (let i = 0; i < data.length; i += 4) {
-      // Apply contrast and brightness
-      data[i] = Math.max(0, Math.min(255, (data[i] - 128) * contrast + 128 + brightness));
-      data[i+1] = Math.max(0, Math.min(255, (data[i+1] - 128) * contrast + 128 + brightness));
-      data[i+2] = Math.max(0, Math.min(255, (data[i+2] - 128) * contrast + 128 + brightness));
-    }
-    
-    ctx.putImageData(imageData, 0, 0);
-  };
 
+    // Wait for video to be ready
+    if (video.videoWidth === 0 || video.videoHeight === 0) {
+      console.warn('Video not ready yet');
+      return;
+    }
+    
+    // Calculate target dimensions while maintaining aspect ratio
+    const maxDimension = 2000; // Maximum width or height
+    let targetWidth = video.videoWidth;
+    let targetHeight = video.videoHeight;
+    
+    if (targetWidth > maxDimension || targetHeight > maxDimension) {
+      if (targetWidth > targetHeight) {
+        targetHeight = Math.round((targetHeight * maxDimension) / targetWidth);
+        targetWidth = maxDimension;
+      } else {
+        targetWidth = Math.round((targetWidth * maxDimension) / targetHeight);
+        targetHeight = maxDimension;
+      }
+    }
+    
+    // Set canvas dimensions to target size
+    canvas.width = targetWidth;
+    canvas.height = targetHeight;
+    
+    // Enable image smoothing for better quality
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+    
+    // Draw the video frame at target size
+    ctx.drawImage(video, 0, 0, targetWidth, targetHeight);
+    
+    // Process the image with all enhancements
+    processImage(
+      ctx,
+      targetWidth,
+      targetHeight,
+      quality,
+      sharpness,
+      enhancementLevel,
+      zoomLevel,
+      position,
+      opticalZoomSupported
+    );
+    
+    // Get the enhanced image with good quality from the processed context
+    const imageSrc = canvas.toDataURL('image/jpeg', 0.95);
+    processedImageRef.current = imageSrc;
+  }, [webcamRef, canvasRef, videoRef, quality, sharpness, enhancementLevel, zoomLevel, position, opticalZoomSupported]);
+  
   // Handle zooming in with limits
   const handleZoomIn = () => {
     const newZoom = Math.min(zoomLevel + 0.25, opticalZoomSupported ? maxOpticalZoom : 4);
@@ -293,6 +275,11 @@ const WebcamCapture: React.FC<{
     }
   };
 
+  const handleResetCamera = () => {
+    handleResetZoom();
+    setPosition({ x: 0, y: 0 });
+  };
+
   // Maximize zoom
   const handleMaxZoom = () => {
     const maxZoom = opticalZoomSupported ? maxOpticalZoom : 4;
@@ -310,8 +297,7 @@ const WebcamCapture: React.FC<{
     setSelectedCameraId(""); // Clear specific camera selection when toggling
     
     // Reset zoom when switching cameras
-    setZoomLevel(1);
-    setPosition({ x: 0, y: 0 });
+    handleResetCamera();
   };
 
   // Select a specific camera by ID
@@ -319,8 +305,7 @@ const WebcamCapture: React.FC<{
     setSelectedCameraId(deviceId);
     
     // Reset zoom when switching cameras
-    setZoomLevel(1);
-    setPosition({ x: 0, y: 0 });
+    handleResetCamera();
   };
 
   // Refresh camera list
@@ -363,11 +348,23 @@ const WebcamCapture: React.FC<{
   // Handle recording interval
   useEffect(() => {
     if (isRecording) {
-      intervalRef.current = window.setInterval(capture, 750);
+      // Capture immediately when recording starts
+      capture();
+      
+      intervalRef.current = window.setInterval(() => {
+        const now = Date.now();
+        // Capture and send image every 750ms
+        capture();
+        if (processedImageRef.current && onCapture) {
+          onCapture(processedImageRef.current);
+          lastCaptureTimeRef.current = now;
+        }
+      }, 750);
     } else {
       if (intervalRef.current) {
         window.clearInterval(intervalRef.current);
       }
+      processedImageRef.current = null;
     }
 
     return () => {
@@ -375,7 +372,7 @@ const WebcamCapture: React.FC<{
         window.clearInterval(intervalRef.current);
       }
     };
-  }, [isRecording, capture]);
+  }, [isRecording, capture, onCapture]);
 
   // Add event listeners for mouse movements outside the component
   useEffect(() => {
@@ -441,7 +438,7 @@ const WebcamCapture: React.FC<{
   };
   
   // Handle quality change
-  const changeQuality = (newQuality: "standard" | "high" | "ultra") => {
+  const changeQuality = (newQuality: QualityLevel) => {
     setQuality(newQuality);
   };
 
@@ -468,13 +465,32 @@ const WebcamCapture: React.FC<{
           {Math.round(zoomLevel * 100)}% {opticalZoomSupported ? '(Optical)' : ''}
         </div>
         
+        {/* Camera controls */}
+        <div className="absolute top-4 right-20 flex space-x-2 z-20">
+          <button 
+            onClick={toggleCamera}
+            className="p-2 rounded-full bg-black/80 text-white hover:bg-black/90 backdrop-blur-sm"
+            title="Switch Camera"
+          >
+            <RefreshCw size={20} />
+          </button>
+          
+          <button 
+            onClick={toggleSettings}
+            className="p-2 rounded-full bg-black/80 text-white hover:bg-black/90 backdrop-blur-sm"
+            title="Settings"
+          >
+            <Settings size={20} />
+          </button>
+        </div>
+        
         {/* Quality indicator */}
-        <div className="absolute top-4 right-4 bg-black bg-opacity-50 text-white px-3 py-1 rounded-full text-sm font-medium z-10">
+        <div className="absolute top-4 right-4 bg-black/80 text-white px-3 py-1 rounded-full text-sm font-medium z-20 backdrop-blur-sm">
           {quality === "ultra" ? "ULTRA HD" : quality === "high" ? "HD" : "Standard"}
         </div>
         
         {/* Camera indicator */}
-        <div className="absolute bottom-4 left-4 bg-black bg-opacity-50 text-white px-3 py-1 rounded-full text-sm font-medium z-10">
+        <div className="absolute bottom-4 left-4 bg-black/80 text-white px-3 py-1 rounded-full text-sm font-medium z-20 backdrop-blur-sm">
           {facingMode === "environment" ? "Rear Camera" : "Front Camera"}
         </div>
         
@@ -487,15 +503,15 @@ const WebcamCapture: React.FC<{
             transition: isDragging ? 'none' : 'transform 0.2s ease-out',
             width: '100%',
             height: '100%',
-            filter: quality === "ultra" ? "contrast(1.05) brightness(1.05)" : "none" // Subtle enhancement
+            filter: getFilterStyleForPreview()
           }}
         >
           <Webcam
             audio={false}
+            width={3840}
             height={2160}
             ref={webcamRef}
             screenshotFormat="image/jpeg"
-            width={3840}
             videoConstraints={getVideoConstraints()}
             imageSmoothing={true}
             className="w-full h-full object-cover"
@@ -518,8 +534,16 @@ const WebcamCapture: React.FC<{
         )}
       </div>
       
-      {/* Main controls */}
+      {/* Main controls - Zoom only */}
       <div className="flex items-center justify-center space-x-4 flex-wrap">
+        <button 
+          onClick={handleResetZoom}
+          className="p-2 rounded-full bg-gray-100 text-gray-600 hover:bg-gray-200"
+          title="Reset Zoom"
+        >
+          <Minimize size={24} />
+        </button>
+
         <button 
           onClick={handleZoomOut}
           disabled={zoomLevel <= 1}
@@ -543,98 +567,70 @@ const WebcamCapture: React.FC<{
         </button>
         
         <button 
-          onClick={handleResetZoom}
-          className="p-2 rounded-full bg-gray-100 text-gray-600 hover:bg-gray-200"
-          title="Reset Zoom"
-        >
-          <Minimize size={24} />
-        </button>
-        
-        <button 
           onClick={handleMaxZoom}
           className="p-2 rounded-full bg-gray-100 text-gray-600 hover:bg-gray-200"
           title="Maximum Zoom"
         >
           <Maximize size={24} />
         </button>
-        
-        <button 
-          onClick={toggleAutoFocus}
-          className={`p-2 rounded-full ${autoFocus ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-600'} hover:bg-opacity-80`}
-          title={autoFocus ? "Auto Focus On" : "Auto Focus Off"}
-        >
-          <Focus size={24} />
-        </button>
-        
-        <button 
-          onClick={toggleCamera}
-          className="p-2 rounded-full bg-blue-100 text-blue-600 hover:bg-blue-200"
-          title="Switch Camera"
-        >
-          <RotateCcw size={24} />
-        </button>
-        
-        <button 
-          onClick={refreshCameras}
-          className="p-2 rounded-full bg-gray-100 text-gray-600 hover:bg-gray-200"
-          title="Refresh Camera List"
-        >
-          <RefreshCw size={24} />
-        </button>
-        
-        <button 
-          onClick={toggleSettings}
-          className="p-2 rounded-full bg-gray-100 text-gray-600 hover:bg-gray-200"
-          title="Settings"
-        >
-          <Settings size={24} />
-        </button>
       </div>
       
       {/* Advanced settings panel */}
       {showSettings && (
-        <div className="p-4 bg-white rounded-lg shadow-lg border border-gray-200">
-          <h3 className="font-medium text-lg mb-3">Advanced Settings</h3>
+        <div className="p-4 bg-green-500/10 border border-green-500/20 rounded-lg shadow-lg">
+          <h3 className="font-medium text-lg mb-3 text-green-400">Advanced Settings</h3>
           
           <div className="space-y-4">
             {/* Camera selection */}
             {availableCameras.length > 0 && (
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Camera</label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-sm font-medium text-green-400">Select Camera</label>
+                  <button 
+                    onClick={refreshCameras}
+                    className="p-1 rounded-full bg-green-500/10 text-green-400 hover:bg-green-500/20"
+                    title="Refresh Camera List"
+                  >
+                    <RotateCcw size={16} />
+                  </button>
+                </div>
                 <select 
                   value={selectedCameraId}
                   onChange={(e) => selectCamera(e.target.value)}
-                  className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                  className="block w-full px-3 py-2 bg-black/80 border border-green-500/20 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 text-green-400 backdrop-blur-sm"
                 >
-                  <option value="">Auto ({facingMode === "environment" ? "Rear" : "Front"})</option>
+                  <option value="" className="bg-black/90">Auto ({facingMode === "environment" ? "Rear" : "Front"})</option>
                   {availableCameras.map((camera) => (
-                    <option key={camera.deviceId} value={camera.deviceId}>
+                    <option key={camera.deviceId} value={camera.deviceId} className="bg-black/90">
                       {camera.label || `Camera ${camera.deviceId.substring(0, 5)}...`}
                     </option>
                   ))}
                 </select>
+                <div className="text-xs text-green-400/70 mt-1">
+                  Available Cameras: {availableCameras.length}
+                </div>
               </div>
             )}
             
             {/* Quality selection */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Quality</label>
+              <label className="block text-sm font-medium text-green-400 mb-1">Image Quality</label>
               <div className="flex space-x-2">
                 <button
                   onClick={() => changeQuality("standard")}
-                  className={`px-3 py-1 rounded ${quality === "standard" ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-700'}`}
+                  className={`px-3 py-1 rounded ${quality === "standard" ? 'bg-green-500 text-white' : 'bg-green-500/10 text-green-400 hover:bg-green-500/20'}`}
                 >
                   Standard
                 </button>
                 <button
                   onClick={() => changeQuality("high")}
-                  className={`px-3 py-1 rounded ${quality === "high" ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-700'}`}
+                  className={`px-3 py-1 rounded ${quality === "high" ? 'bg-green-500 text-white' : 'bg-green-500/10 text-green-400 hover:bg-green-500/20'}`}
                 >
                   High
                 </button>
                 <button
                   onClick={() => changeQuality("ultra")}
-                  className={`px-3 py-1 rounded ${quality === "ultra" ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-700'}`}
+                  className={`px-3 py-1 rounded ${quality === "ultra" ? 'bg-green-500 text-white' : 'bg-green-500/10 text-green-400 hover:bg-green-500/20'}`}
                 >
                   Ultra HD
                 </button>
@@ -643,8 +639,8 @@ const WebcamCapture: React.FC<{
             
             {/* Enhancement level */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Enhancement Level: {enhancementLevel}
+              <label className="block text-sm font-medium text-green-400 mb-1">
+                Image Enhancement: {enhancementLevel}
               </label>
               <input
                 type="range"
@@ -652,14 +648,17 @@ const WebcamCapture: React.FC<{
                 max="5"
                 value={enhancementLevel}
                 onChange={(e) => setEnhancementLevel(parseInt(e.target.value))}
-                className="w-full"
+                className="w-full accent-green-500"
               />
+              <div className="text-xs text-green-400/70 mt-1">
+                0: No enhancement - 5: Maximum enhancement
+              </div>
             </div>
             
             {/* Sharpness level */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Sharpness: {sharpness}
+              <label className="block text-sm font-medium text-green-400 mb-1">
+                Image Sharpness: {sharpness}
               </label>
               <input
                 type="range"
@@ -667,14 +666,37 @@ const WebcamCapture: React.FC<{
                 max="4"
                 value={sharpness}
                 onChange={(e) => setSharpness(parseInt(e.target.value))}
-                className="w-full"
+                className="w-full accent-green-500"
               />
+              <div className="text-xs text-green-400/70 mt-1">
+                0: No sharpening - 4: Maximum sharpness
+              </div>
+            </div>
+            
+            {/* Auto Focus section */}
+            <div>
+              <label className="block text-sm font-medium text-green-400 mb-1">
+                Auto Focus
+              </label>
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={() => setAutoFocus(true)}
+                  className={`px-3 py-1 rounded ${autoFocus ? 'bg-green-500 text-white' : 'bg-green-500/10 text-green-400 hover:bg-green-500/20'}`}
+                >
+                  On
+                </button>
+                <button
+                  onClick={() => setAutoFocus(false)}
+                  className={`px-3 py-1 rounded ${!autoFocus ? 'bg-green-500 text-white' : 'bg-green-500/10 text-green-400 hover:bg-green-500/20'}`}
+                >
+                  Off
+                </button>
+              </div>
             </div>
             
             {/* Camera capabilities info */}
-            <div className="text-sm text-gray-600 mt-2 border-t pt-2">
+            <div className="text-sm text-green-400/70 mt-2 border-t border-green-500/20 pt-2">
               <div>Optical Zoom: {opticalZoomSupported ? `Supported (up to ${maxOpticalZoom}x)` : "Not supported"}</div>
-              <div>Cameras Detected: {availableCameras.length}</div>
             </div>
           </div>
         </div>

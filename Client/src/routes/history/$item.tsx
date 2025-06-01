@@ -4,6 +4,8 @@ import { useAuth } from '@/hooks/useAuth.ts'
 import { Logo } from '@/components/logo/logo'
 import type { Record, RecordResponse } from '@/lib/api'
 import { Button } from '@/components/ui/button'
+import { Eye, ArrowRight } from 'lucide-react' // Add these imports
+import EnhancedOSINTDisplay from '@/components/OSINT' // Add OSINT component import
 
 function formatDate(dateString: string): string {
   const date = new Date(dateString);
@@ -19,31 +21,36 @@ function formatDate(dateString: string): string {
   });
 }
 
-// Extract first row of data, splitting by newline
-function getFirstRow(data: string): { value: string, type: string } {
-  const firstLine = data.split('\n')[0];
-  const parts = firstLine.split(':');
-  
-  if (parts.length >= 2) {
-    return {
-      value: parts[0],
-      type: parts[1]
-    };
+// Extract all rows of data, splitting by newline
+function getAllRows(data: string): Array<{ value: string, type: string }> {
+  // Split by newline and filter out empty lines
+  const lines = data.split('\n').filter(line => line.trim() !== '');
+  if (lines.length === 0) {
+    return [{
+      value: 'No data',
+      type: 'Unknown'
+    }];
   }
-  
-  return {
-    value: firstLine,
-    type: 'Unknown'
-  };
+
+  return lines.map(line => {
+    const parts = line.split(':');
+    if (parts.length >= 2 && parts[1].trim() !== '') {
+      return {
+        value: parts[0].trim(),
+        type: parts[1].trim()
+      };
+    }
+    return {
+      value: line.trim(),
+      type: 'Unknown'
+    };
+  });
 }
 
 export const Route = createFileRoute('/history/$item')({
   component: RouteComponent,
   loader: async ({ params }) => {
-    // Add cache parameter to prevent browser caching
-    const response = await fetch(`/history/record/${params.item}?t=${Date.now()}`, {
-      credentials: 'include'
-    })
+    const response = await fetch(`/history/record/${params.item}`, {credentials: 'include'})
     if (!response.ok) {
       throw new Error(`Error: ${response.status} - ${response.statusText}`)
     }
@@ -96,36 +103,73 @@ function ConfirmationModal({
 function RouteComponent() {
   useAuth() // Add authentication check
   const router = useRouter()
-  const [data, setData] = useState<RecordResponse | null>(null)
-  const [loading, setLoading] = useState(true)
+  const data: RecordResponse = Route.useLoaderData()
   const [error, setError] = useState<string | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
   const [showModal, setShowModal] = useState(false)
+  const [showOSINT, setShowOSINT] = useState(false)
   const params = Route.useParams()
   
-  useEffect(() => {
-    async function fetchData() {
-      setLoading(true)
-      try {
-        const response = await fetch(`/history/record/${params.item}?t=${Date.now()}`, {
-          credentials: 'include'
-        })
-        
-        if (!response.ok) {
-          throw new Error(`Error: ${response.status} - ${response.statusText}`)
-        }
-        
-        const responseData = await response.json()
-        setData(responseData)
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to load record')
-      } finally {
-        setLoading(false)
+  // Handle OSINT enhancement
+  const handleOSINTEnhance = async () => {
+  try {
+    console.log(`⚡ Starting QUICK OSINT enhancement for scan ${params.item}`);
+    
+    // Use the new quick OSINT endpoint for speed
+    const quickResponse = await fetch(`/api/quick-osint/${params.item}`, {
+      method: 'POST',
+      credentials: 'include'
+    });
+    
+    if (quickResponse.ok) {
+      const quickData = await quickResponse.json();
+      console.log('⚡ Quick OSINT results:', quickData);
+      
+      if (quickData.success) {
+        console.log('✅ Quick enhancement completed in under 10 seconds!');
+        console.log(`📊 Performance: ${quickData.performance?.estimated_time}`);
+        console.log(`🔍 Generated ${quickData.performance?.results_generated} results`);
+        setShowOSINT(true);
+        return;
+      } else {
+        console.error('❌ Quick OSINT failed:', quickData.message);
+        // Fall back to regular enhancement
+        console.log('⚠️ Falling back to regular enhancement...');
+      }
+    } else {
+      console.log('⚠️ Quick mode failed, trying regular enhancement...');
+    }
+    
+    // Fallback: Use force refresh (slower but more comprehensive)
+    console.log(`🔄 Using comprehensive enhancement as fallback...`);
+    const refreshResponse = await fetch(`/api/force-refresh-osint/${params.item}`, {
+      method: 'POST',
+      credentials: 'include'
+    });
+    
+    if (refreshResponse.ok) {
+      const refreshData = await refreshResponse.json();
+      console.log('✅ Comprehensive enhancement results:', refreshData);
+      
+      if (refreshData.success) {
+        console.log('✅ Comprehensive enhancement completed');
+        setShowOSINT(true);
+        return;
       }
     }
     
-    fetchData()
-  }, [params.item])
+    // Final fallback
+    alert('Enhancement failed. Please try again.');
+    
+  } catch (error) {
+    console.error('❌ Enhancement error:', error);
+    alert(`Enhancement error: ${error}`);
+  }
+};
+
+  const handleBackFromOSINT = () => {
+    setShowOSINT(false);
+  };
   
   // Handle modal open
   const handleDeleteClick = () => {
@@ -158,10 +202,8 @@ function RouteComponent() {
         throw new Error(`Failed to delete: ${response.status} - ${response.statusText}`)
       }
       
-      // Immediately navigate back to history page
-      // Store the deleted ID in localStorage instead of route state
-      localStorage.setItem('deletedRecordId', params.item);
-      router.navigate({ to: '/history' });
+      // Redirect to history page after successful deletion
+      router.navigate({ to: '/history' })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to delete record')
       setIsDeleting(false)
@@ -181,26 +223,9 @@ function RouteComponent() {
     return () => window.removeEventListener('keydown', handleEscape);
   }, [showModal]);
   
-  // Show loading state
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-background" 
-      style={{ backgroundImage: "url('/images/background.jpg')" }}>
-        <div className="max-w-2xl mx-auto py-12 px-4 sm:px-6 lg:px-8">
-          <Logo className="mb-12" />
-          <div className="bg-card rounded-xl shadow-2xl p-8 flex flex-col items-center justify-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary mb-4"></div>
-            <p className="text-muted-foreground">Loading record details...</p>
-          </div>
-        </div>
-      </div>
-    )
-  }
-  
   if (error || !data || !data.record || data.record.length === 0) {
     return (
-      <div className="min-h-screen bg-background"
-      style={{ backgroundImage: "url('/images/background.jpg')" }}>
+      <div className="min-h-screen bg-background">
         <div className="max-w-2xl mx-auto py-12 px-4 sm:px-6 lg:px-8">
           <Logo className="mb-12" />
           <div className="bg-card rounded-xl shadow-2xl p-8">
@@ -221,8 +246,18 @@ function RouteComponent() {
     )
   }
 
+  // Show OSINT component if requested
+  if (showOSINT) {
+    return (
+      <EnhancedOSINTDisplay 
+        scanId={parseInt(params.item)} 
+        onClose={handleBackFromOSINT}
+      />
+    );
+  }
+
   const record = data.record[0];
-  const { value, type } = getFirstRow(record[2]);
+  const rows = getAllRows(record[2]);
 
   return (
     <div className="min-h-screen bg-background text-foreground"
@@ -239,25 +274,45 @@ function RouteComponent() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4 text-sm">
-              <div className="space-y-1">
-                <p className="text-muted-foreground">Date</p>
-                <p className="text-foreground">{formatDate(record[1])}</p>
-              </div>
-              <div className="space-y-1">
-                <p className="text-muted-foreground">Data Type</p>
-                <p className="text-foreground">{type}</p>
-              </div>
+            <div className="space-y-1">
+              <p className="text-muted-foreground">Date</p>
+              <p className="text-foreground">{formatDate(record[1])}</p>
             </div>
 
             <div className="space-y-2">
               <p className="text-muted-foreground">Content</p>
-              <div className="bg-muted rounded-lg p-4">
-                <p className="text-foreground">{value}</p>
+              <div className="space-y-2">
+                {rows.map((row, index) => (
+                  <div key={index} className="bg-muted rounded-lg p-4 flex justify-between items-center">
+                    <div>
+                      <p className="text-foreground font-medium">{row.value}</p>
+                      <p className="text-sm text-muted-foreground mt-1">Type: {row.type}</p>
+                    </div>
+                    <div className="px-3 py-1 rounded-full text-xs font-medium bg-primary/10 text-primary">
+                      {`Entry ${index + 1}`}
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
             
-            <div className="pt-4 border-t border-border">
+            <div className="pt-4 border-t border-border space-y-3">
+              <div className="flex flex-col items-end gap-2">
+                <button
+                  onClick={handleOSINTEnhance}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                >
+                  <Eye className="w-4 h-4" />
+                  Enhance with OSINT
+                  <ArrowRight className="w-4 h-4" />
+                </button>
+                
+                <div className="text-xs text-gray-500 text-center">
+                  Click to start OSINT<br />
+                  intelligence gathering
+                </div>
+              </div>
+              
               <Button
                 onClick={handleDeleteClick}
                 disabled={isDeleting}
@@ -276,7 +331,12 @@ function RouteComponent() {
           >
             <span className="mr-2">←</span> Back
           </Link>
-        
+          <Link
+            to="/"
+            className="px-6 py-3 bg-card hover:bg-accent rounded-lg font-semibold transition-all duration-200 flex items-center text-foreground hover:text-accent-foreground border border-border"
+          >
+            Forward <span className="ml-2">→</span>
+          </Link>
         </div>
       </div>
       

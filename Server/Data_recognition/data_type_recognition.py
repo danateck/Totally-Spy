@@ -1,23 +1,60 @@
 import re
+from textblob import TextBlob  # Lightweight NLP
 
-
+# Precompile patterns for performance
 patterns = {
-    "OTP": r"\b\d{5,6}\b",  # OTP can be 5 or 6 digits
-    "CREDIT_CARD": r"\b(?:\d{4}[- ]?){3}\d{4}\b",  # 16-digit CC, supports space or - separators
-    "PHONE_NUMBER": r"\b\d{10}\b",  # Strictly 10-digit phone number
-    "EMAIL": r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b",  # Email
-    "PASSWORD": r"(?=.*[A-Za-z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}",  # Password with special char, min 8 chars
-    "ID": r"\b\d{9}\b",  # Strictly 9-digit ID
-    "DATE": r"\b\d{1,2}[-/.]\d{1,2}[-/.]\d{2,4}\b",  # Date format (e.g., 25/03/2023)
+    "OTP": re.compile(r"(?i)(?:code|otp|passcode|one-time|קוד|אימות|סיסמה)[^\d]{0,10}(\d{5,6})"),
+    "CREDIT_CARD": re.compile(r"\b(?:\d{4}[- ]?){3}\d{4}\b"),
+    "PHONE_NUMBER": re.compile(r"(?:(?:\+972|0)[-\s]?(?:[23489]|5[0123456789])[-\s]?\d{7})|(?:\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4})"),
+    "EMAIL": re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b"),
+    "PASSWORD": re.compile(r"(?=.*[A-Za-z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}"),
+    "ID": re.compile(r"\b\d{9}\b"),  # Israeli ID is 9 digits
+    "DATE": re.compile(r"\b\d{1,2}[-/.]\d{1,2}[-/.]\d{2,4}\b"),
+    "DOMAIN": re.compile(r"\b(?:https?://)?(?:www\.)?([\w\-]+\.[a-z]{2,}(?:\.[a-z]{2,})?)"),
+    "CVC": re.compile(r"(?i)(?:cvc|cvv|security code|קוד אבטחה)[^\d]{0,10}(\d{3,4})"),
+
+    # New address detection
+    "ADDRESS_HEBREW": re.compile(
+        r"(?:רחוב|שדרות|דרך|כיכר)\s+[א-ת\"'\-\s]+\s+\d{1,4}(?:[,]\s*[א-ת\"'\-\s]+)?"
+    ),
+    "ADDRESS_ENGLISH": re.compile(
+        r"\b\d{1,5}\s+(?:[A-Z][a-z]*\s){1,3}(?:St|Street|Ave|Avenue|Rd|Road|Blvd|Boulevard|Lane|Ln|Dr|Drive|Ct|Court)\b(?:,\s*\w+)*"
+    ),
 }
 
-def classify_text(text: str)-> list[tuple[str, str]]:
+def classify_text(text: str) -> list[tuple[str, str]]:
     detected = []
-    # Go through each pattern and match it in the text
-    for label, pattern in patterns.items():
-        matches = re.findall(pattern, text)
-        for match in matches:
-            # Ensure that each match is classified once
-            detected.append((match, label))
-    return detected # results have data, data_type
+    detected_spans = []  # Track start/end of each match to avoid overlaps
 
+    priority_order = [
+        "OTP", "EMAIL", "CREDIT_CARD", "CVC", "PHONE_NUMBER", "PASSWORD",
+        "ID", "DATE", "DOMAIN", "ADDRESS_HEBREW", "ADDRESS_ENGLISH"
+    ]
+
+    for label in priority_order:
+        pattern = patterns[label]
+        for match in pattern.finditer(text):
+            value = match.group(1) if match.groups() else match.group()
+            span = match.span()
+
+            # Skip overlapping matches
+            if any(start <= span[0] < end or start < span[1] <= end for start, end in detected_spans):
+                continue
+
+            # Normalize address labels
+            normalized_label = "ADDRESS" if "ADDRESS" in label else label
+
+            detected.append((value.strip(), normalized_label))
+            detected_spans.append(span)
+
+    # --- AI-style heuristic: Detect ambiguous sensitive numbers ---
+    fallback_matches = re.findall(r"\b\d{5,12}\b", text)
+    for val in fallback_matches:
+        if any(val in item[0] for item in detected):
+            continue
+        context_blob = TextBlob(text)
+        if context_blob.words.count(val) == 0:
+            continue  
+        detected.append((val, "POTENTIALLY_SENSITIVE"))  
+
+    return detected
