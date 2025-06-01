@@ -1,3 +1,4 @@
+
 import os
 import psycopg2
 import bcrypt
@@ -624,6 +625,8 @@ def decrypt_data(user_id, encrypted_text):
             conn.close()
     return None
 
+logger = logging.getLogger(__name__)
+
 
 def get_scan_history(username: str) -> list[tuple[int, str, str]]:
     conn = get_db_connection()
@@ -639,38 +642,78 @@ def get_scan_history(username: str) -> list[tuple[int, str, str]]:
                     cur.execute("""
                         SELECT id, scan_time, detected_text, name 
                         FROM scan_history 
-                        WHERE user_id = %s;
+                        WHERE user_id = %s
+                        ORDER BY scan_time DESC;
                     """, (user_id,))
                     scans = cur.fetchall()
+                    
+                    # Check if scans were found
+                    if not scans:
+                        logger.info(f"No scan history found for user: {username}")
+                        return []
+                    
                     # Filter out records with empty decrypted data
                     decrypted_scans = []
                     for scan in scans:
-                        decrypted_text = decrypt_data(user_id, scan[2])
-                        if decrypted_text and decrypted_text.strip():  # Check if decrypted text exists and is not just whitespace
-                            decrypted_scans.append((scan[0], scan[1], scan[3]))  # Use scan[3] for name
+                        try:
+                            decrypted_text = decrypt_data(user_id, scan[2])
+                            if decrypted_text and decrypted_text.strip():  # Check if decrypted text exists and is not just whitespace
+                                # Return (id, scan_time, name) - using scan[3] for name
+                                decrypted_scans.append((scan[0], scan[1], scan[3] or "Unnamed"))  # Handle NULL names
+                        except Exception as decrypt_error:
+                            logger.error(f"Error decrypting scan {scan[0]}: {decrypt_error}")
+                            continue  # Skip this record if decryption fails
+                    
                     return decrypted_scans
                 else:
-                    logger.warning("No user found")
+                    logger.warning(f"No user found with username: {username}")
                     return []
         except Exception as e:
-            logger.error(f"Error fetching scan history: {e}")
+            logger.error(f"Error fetching scan history for {username}: {e}")
+            return []  # Return empty list instead of None
         finally:
             conn.close()
-    return []
+    else:
+        logger.error("Failed to get database connection")
+        return []  # Return empty list if no connection
+
 
 def get_scan_history_by_id(user_id: int, record_id: int) -> list[tuple[int, str, str]]:
     conn = get_db_connection()
     if conn:
         try:
             with conn.cursor() as cur:
-                cur.execute("SELECT id, scan_time, detected_text FROM scan_history WHERE id = %s;", (record_id,))
+                # Add user_id check for security
+                cur.execute("""
+                    SELECT id, scan_time, detected_text, name 
+                    FROM scan_history 
+                    WHERE id = %s AND user_id = %s;
+                """, (record_id, user_id))
                 scan = cur.fetchone()
-                decrypted_scan = [(scan[0], scan[1], decrypt_data(user_id, scan[2]))]
-                return decrypted_scan
+                
+                if scan:
+                    try:
+                        decrypted_text = decrypt_data(user_id, scan[2])
+                        if decrypted_text:
+                            # Return (id, scan_time, decrypted_text)
+                            return [(scan[0], scan[1], decrypted_text)]
+                        else:
+                            logger.warning(f"Failed to decrypt scan {record_id}")
+                            return []
+                    except Exception as decrypt_error:
+                        logger.error(f"Error decrypting scan {record_id}: {decrypt_error}")
+                        return []
+                else:
+                    logger.warning(f"No scan found with id {record_id} for user {user_id}")
+                    return []
         except Exception as e:
-            logger.error(f"Error fetching scan history: {e}")
+            logger.error(f"Error fetching scan history by id {record_id}: {e}")
+            return []  # Return empty list instead of None
         finally:
             conn.close()
+    else:
+        logger.error("Failed to get database connection")
+        return []  # Return empty list if no connection
 
 
 def create_session_table():
