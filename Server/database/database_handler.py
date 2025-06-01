@@ -1,4 +1,3 @@
-
 import os
 import psycopg2
 import bcrypt
@@ -625,8 +624,6 @@ def decrypt_data(user_id, encrypted_text):
             conn.close()
     return None
 
-logger = logging.getLogger(__name__)
-
 
 def get_scan_history(username: str) -> list[tuple[int, str, str]]:
     conn = get_db_connection()
@@ -652,17 +649,22 @@ def get_scan_history(username: str) -> list[tuple[int, str, str]]:
                         logger.info(f"No scan history found for user: {username}")
                         return []
                     
-                    # Filter out records with empty decrypted data
+                    # Process records with proper error handling
                     decrypted_scans = []
                     for scan in scans:
                         try:
                             decrypted_text = decrypt_data(user_id, scan[2])
-                            if decrypted_text and decrypted_text.strip():  # Check if decrypted text exists and is not just whitespace
+                            # Check if decryption was successful (not None)
+                            if decrypted_text is not None:
                                 # Return (id, scan_time, name) - using scan[3] for name
-                                decrypted_scans.append((scan[0], scan[1], scan[3] or "Unnamed"))  # Handle NULL names
+                                decrypted_scans.append((scan[0], scan[1], scan[3] or "Unnamed"))
+                            else:
+                                # Skip records with decryption failures
+                                logger.warning(f"Skipping scan {scan[0]} due to decryption failure")
                         except Exception as decrypt_error:
-                            logger.error(f"Error decrypting scan {scan[0]}: {decrypt_error}")
-                            continue  # Skip this record if decryption fails
+                            logger.warning(f"Error decrypting scan {scan[0]}: {decrypt_error}")
+                            # Skip records with decryption errors
+                            continue
                     
                     return decrypted_scans
                 else:
@@ -683,39 +685,26 @@ def get_scan_history_by_id(user_id: int, record_id: int) -> list[tuple[int, str,
     if conn:
         try:
             with conn.cursor() as cur:
-                # Add user_id check for security
-                cur.execute("""
-                    SELECT id, scan_time, detected_text, name 
-                    FROM scan_history 
-                    WHERE id = %s AND user_id = %s;
-                """, (record_id, user_id))
+                cur.execute("SELECT id, scan_time, detected_text FROM scan_history WHERE id = %s;", (record_id,))
                 scan = cur.fetchone()
-                
                 if scan:
-                    try:
-                        decrypted_text = decrypt_data(user_id, scan[2])
-                        if decrypted_text:
-                            # Return (id, scan_time, decrypted_text)
-                            return [(scan[0], scan[1], decrypted_text)]
-                        else:
-                            logger.warning(f"Failed to decrypt scan {record_id}")
-                            return []
-                    except Exception as decrypt_error:
-                        logger.error(f"Error decrypting scan {record_id}: {decrypt_error}")
+                    # Decrypt the data and check if successful
+                    decrypted_text = decrypt_data(user_id, scan[2])
+                    if decrypted_text is not None:
+                        decrypted_scan = [(scan[0], scan[1], decrypted_text)]
+                        return decrypted_scan
+                    else:
+                        logger.warning(f"Failed to decrypt scan with id {record_id}")
                         return []
                 else:
-                    logger.warning(f"No scan found with id {record_id} for user {user_id}")
+                    logger.warning(f"No scan found with id {record_id}")
                     return []
         except Exception as e:
-            logger.error(f"Error fetching scan history by id {record_id}: {e}")
-            return []  # Return empty list instead of None
+            logger.error(f"Error fetching scan history: {e}")
+            return []
         finally:
             conn.close()
-    else:
-        logger.error("Failed to get database connection")
-        return []  # Return empty list if no connection
-
-
+    return []
 def create_session_table():
     conn = get_db_connection()
     if conn:
@@ -989,24 +978,28 @@ def respond_to_portfolio_request(user_id: int, request_id: int, action: str) -> 
     finally:
         conn.close()
 
-def get_pending_requests_for_user(user_id: int):
+def get_pending_requests_for_user(user_id: int) -> list[tuple[int, int, str, str, str]]:
+    """
+    Returns all pending portfolio join requests for a specific user.
+
+    Returns:
+        A list of tuples with: (request_id, portfolio_id, portfolio_name, role, created_at)
+    """
     conn = get_db_connection()
-    if not conn:
-        return []
-    try:
-        with conn.cursor() as cur:
-            cur.execute("""
-                SELECT 
-                    r.id, 
-                    r.portfolio_id, 
-                    r.requested_by_user_id, 
-                    u.username AS requester_name,
-                    p.name AS portfolio_name
-                FROM portfolio_join_requests r
-                JOIN users u ON r.requested_by_user_id = u.id
-                JOIN portfolios p ON r.portfolio_id = p.id
-                WHERE r.target_user_id = %s AND r.status = 'pending';
-            """, (user_id,))
-            return cur.fetchall()
-    finally:
-        conn.close()
+    requests = []
+    if conn:
+        try:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT r.id, r.portfolio_id, p.name, r.role, r.created_at
+                    FROM portfolio_join_requests r
+                    JOIN portfolios p ON r.portfolio_id = p.id
+                    WHERE r.target_user_id = %s AND r.status = 'pending'
+                    ORDER BY r.created_at DESC;
+                """, (user_id,))
+                requests = cur.fetchall()
+        except Exception as e:
+            logger.error(f"Error fetching pending requests for user {user_id}: {e}")
+        finally:
+            conn.close()
+    return requests
