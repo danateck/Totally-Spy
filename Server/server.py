@@ -13,6 +13,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse, FileResponse, JSONResponse
 from pydantic import BaseModel
 import cv2
+from typing import Literal
 
 from Data_recognition.data_type_recognition import classify_text
 from Enhance_Image.pictureChange import enhance_image
@@ -93,6 +94,10 @@ class RemoveMemberRequest(BaseModel):
 
 class ScanOwnershipRequest(BaseModel):
     scanId: int
+
+class RespondRequestBody(BaseModel):
+    requestId: int
+    action: Literal["approve", "reject"]
 
 def convert_to_formatted_string(detected_texts: list[tuple[str, str]]) -> str:
     # Join each tuple into a single line with label and value separated by ':'
@@ -598,6 +603,37 @@ async def check_scan_ownership(data: ScanOwnershipRequest, user: User = Depends(
     except Exception as e:
         logger.error(f"Error checking scan ownership: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+    
+@app.get("/portfolio/request/status")
+async def check_request_status(portfolio_id: int, user: User = Depends(get_current_user)):
+    try:
+        status = get_request_status(portfolio_id, user.id)
+        return {"status": status or "not_found"}
+    except Exception as e:
+        logger.error(f"Failed to fetch request status: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+    
+@app.get("/portfolio/request/pending")
+async def get_pending_requests(user: User = Depends(get_current_user)):
+    try:
+        requests = get_pending_requests_for_user(user.id)
+        return {"requests": requests}
+    except Exception as e:
+        logger.error(f"Failed to fetch pending requests: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+@app.post("/portfolio/request/respond")
+async def respond_to_request(data: RespondRequestBody, user: User = Depends(get_current_user)):
+    try:
+        success = respond_to_portfolio_request(user.id, data.requestId, data.action)
+        if not success:
+            raise HTTPException(status_code=400, detail="Invalid request or already handled")
+        return {"message": f"Request {data.action}ed successfully"}
+    except Exception as e:
+        logger.error(f"Error responding to request: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
 
 
 
