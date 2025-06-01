@@ -946,28 +946,24 @@ def respond_to_portfolio_request(user_id: int, request_id: int, action: str) -> 
     finally:
         conn.close()
 
-def get_pending_requests_for_user(user_id: int) -> list[tuple[int, int, str, str, str]]:
-    """
-    Returns all pending portfolio join requests for a specific user.
-
-    Returns:
-        A list of tuples with: (request_id, portfolio_id, portfolio_name, role, created_at)
-    """
+def get_pending_requests_for_user(user_id: int):
     conn = get_db_connection()
-    requests = []
-    if conn:
-        try:
-            with conn.cursor() as cur:
-                cur.execute("""
-                    SELECT r.id, r.portfolio_id, p.name, r.role, r.created_at
-                    FROM portfolio_join_requests r
-                    JOIN portfolios p ON r.portfolio_id = p.id
-                    WHERE r.target_user_id = %s AND r.status = 'pending'
-                    ORDER BY r.created_at DESC;
-                """, (user_id,))
-                requests = cur.fetchall()
-        except Exception as e:
-            logger.error(f"Error fetching pending requests for user {user_id}: {e}")
-        finally:
-            conn.close()
-    return requests
+    if not conn:
+        return []
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT 
+                    r.id, 
+                    r.portfolio_id, 
+                    r.requested_by_user_id, 
+                    u.username AS requester_name,
+                    p.name AS portfolio_name
+                FROM portfolio_join_requests r
+                JOIN users u ON r.requested_by_user_id = u.id
+                JOIN portfolios p ON r.portfolio_id = p.id
+                WHERE r.target_user_id = %s AND r.status = 'pending';
+            """, (user_id,))
+            return cur.fetchall()
+    finally:
+        conn.close()

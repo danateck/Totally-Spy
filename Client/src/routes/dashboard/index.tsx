@@ -44,13 +44,20 @@ function DashboardComponent() {
         </button>
       </div>
 
-      {/* Profile Button in top-right corner */}
-      <div className="absolute top-4 right-4">
+      {/* Profile + Requests buttons in top-right corner */}
+      <div className="absolute top-4 right-4 flex gap-2">
         <Link
           to="/profile"
           className="text-sm text-white bg-card px-4 py-2 rounded-md shadow hover:bg-accent transition-all border border-border"
         >
           My Profile
+        </Link>
+
+        <Link 
+          to="/my-requests"
+          className="text-sm text-white bg-card px-4 py-2 rounded-md shadow hover:bg-accent transition-all border border-border"
+        >
+          My Requests
         </Link>
       </div>
 
