@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
 import { Logo } from '@/components/logo/logo'
 import { ScanDetails } from '@/components/scan-details'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 
 interface Scan {
   id: number
@@ -12,6 +12,11 @@ interface Scan {
 interface Member {
   username: string
   role: string
+}
+
+interface User {
+  username: string
+  // Add other user properties if needed
 }
 
 export const Route = createFileRoute('/portfolio/$id')({
@@ -42,6 +47,14 @@ function PortfolioComponent() {
   const [selectedMember, setSelectedMember] = useState<Member | null>(null)
   const [newRole, setNewRole] = useState('')
   const [showDeleteMemberModal, setShowDeleteMemberModal] = useState(false)
+  
+  // New states for user autocomplete
+  const [filteredUsers, setFilteredUsers] = useState<User[]>([])
+  const [showUserDropdown, setShowUserDropdown] = useState(false)
+  const [selectedUserIndex, setSelectedUserIndex] = useState(-1)
+  const inputRef = useRef<HTMLInputElement>(null)
+  const dropdownRef = useRef<HTMLDivElement>(null)
+  const searchTimeoutRef = useRef<number | null>(null)
 
   const handleError = (err: Error | string) => {
     const errorMessage = err instanceof Error ? err.message : err
@@ -51,6 +64,157 @@ function PortfolioComponent() {
     setShowAddMemberModal(false)
     setShowAddScanModal(false)
   }
+
+  // Fetch users for autocomplete based on search term
+  const fetchUsers = async (searchTerm: string) => {
+    try {
+      console.log('Fetching users with search term:', searchTerm)
+      
+      const response = await fetch(`/users/search?q=${encodeURIComponent(searchTerm)}`, {
+        credentials: 'include',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json'
+        }
+      })
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch users')
+      }
+      
+      const userData = await response.json()
+      console.log('Received user data:', userData)
+      
+      return userData.users || []
+    } catch (err) {
+      console.error('Error fetching users:', err)
+      return []
+    }
+  }
+
+  // Filter users based on input with debounced API calls
+  const filterUsers = async (searchTerm: string) => {
+    console.log('🔍 Searching for users with term:', searchTerm)
+    
+    if (!searchTerm) {
+      console.log('❌ Empty search term, hiding dropdown')
+      setFilteredUsers([])
+      setShowUserDropdown(false)
+      return
+    }
+
+    try {
+      // Fetch users from API
+      const users = await fetchUsers(searchTerm)
+      console.log('📊 API returned users:', users)
+      
+      if (!users || users.length === 0) {
+        console.log('❌ No users found from API')
+        setFilteredUsers([])
+        setShowUserDropdown(true) // Show dropdown with "no results" message
+        return
+      }
+      
+      // Get existing member usernames
+      const existingUsernames = members.map(m => m.username)
+      console.log('👥 Existing portfolio members:', existingUsernames)
+      
+      // Show ALL users from API (don't filter out existing members for debugging)
+      const allUsersWithStatus = users.map((user: User) => ({
+        ...user,
+        isExistingMember: existingUsernames.includes(user.username)
+      }))
+      
+      console.log('📋 All users with member status:', allUsersWithStatus)
+      
+      // For now, let's show all users (including existing members) to debug
+      const filtered = users.slice(0, 10) // Show all results, limit to 10
+      
+      console.log('✅ Final filtered users (showing all):', filtered)
+      console.log('👀 Will show dropdown:', true)
+      
+      setFilteredUsers(filtered)
+      setShowUserDropdown(true) // Always show if we have any results
+      setSelectedUserIndex(-1)
+      
+    } catch (err) {
+      console.error('❌ Error filtering users:', err)
+      setFilteredUsers([])
+      setShowUserDropdown(false)
+    }
+  }
+
+  // Handle username input change with debouncing
+  const handleUsernameChange = (value: string) => {
+    setNewMemberUsername(value)
+    
+    // Clear previous timeout
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current)
+    }
+    
+    // If empty, hide dropdown immediately
+    if (!value.trim()) {
+      setFilteredUsers([])
+      setShowUserDropdown(false)
+      return
+    }
+    
+    // Debounce the API call for non-empty values
+    searchTimeoutRef.current = setTimeout(() => {
+      filterUsers(value.trim())
+    }, 200) // Reduced to 200ms for faster response
+  }
+
+  // Handle user selection from dropdown
+  const selectUser = (username: string) => {
+    setNewMemberUsername(username)
+    setShowUserDropdown(false)
+    setFilteredUsers([])
+    setSelectedUserIndex(-1)
+  }
+
+  // Handle keyboard navigation
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (!showUserDropdown) return
+
+    switch (e.key) {
+      case 'ArrowDown':
+        e.preventDefault()
+        setSelectedUserIndex(prev => 
+          prev < filteredUsers.length - 1 ? prev + 1 : prev
+        )
+        break
+      case 'ArrowUp':
+        e.preventDefault()
+        setSelectedUserIndex(prev => prev > 0 ? prev - 1 : -1)
+        break
+      case 'Enter':
+        e.preventDefault()
+        if (selectedUserIndex >= 0 && selectedUserIndex < filteredUsers.length) {
+          selectUser(filteredUsers[selectedUserIndex].username)
+        }
+        break
+      case 'Escape':
+        setShowUserDropdown(false)
+        setSelectedUserIndex(-1)
+        break
+    }
+  }
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node) &&
+          inputRef.current && !inputRef.current.contains(event.target as Node)) {
+        setShowUserDropdown(false)
+        setSelectedUserIndex(-1)
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
 
   const fetchPortfolioData = async () => {
     setLoading(true)
@@ -144,6 +308,15 @@ function PortfolioComponent() {
     fetchPortfolioData()
   }, [id])
 
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current)
+      }
+    }
+  }, [])
+
   const handleAddMember = async () => {
     if (!newMemberUsername.trim()) return
 
@@ -169,6 +342,8 @@ function PortfolioComponent() {
       setNewMemberUsername('')
       setNewMemberRole('editor')
       setShowAddMemberModal(false)
+      setShowUserDropdown(false)
+      setFilteredUsers([])
       fetchPortfolioData()
     } catch (err) {
       handleError(err instanceof Error ? err.message : 'Failed to add member')
@@ -440,6 +615,9 @@ function PortfolioComponent() {
               <button
                 onClick={() => {
                   setNewMemberUsername('')
+                  setNewMemberRole('editor')
+                  setShowUserDropdown(false)
+                  setFilteredUsers([])
                   setShowAddMemberModal(true)
                 }}
                 className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
@@ -538,22 +716,90 @@ function PortfolioComponent() {
 
         {/* Add Member Modal */}
         {showAddMemberModal && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center">
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
             <div className="bg-card p-6 rounded-xl shadow-lg w-full max-w-md">
               <h2 className="text-xl font-bold mb-4">Add Member</h2>
               <div className="space-y-4">
-                <div>
+                <div className="relative">
                   <label htmlFor="username" className="block text-sm font-medium text-muted-foreground mb-1">
                     Username
                   </label>
                   <input
+                    ref={inputRef}
                     id="username"
                     type="text"
                     value={newMemberUsername}
-                    onChange={(e) => setNewMemberUsername(e.target.value)}
-                    placeholder="Enter username"
-                    className="w-full px-4 py-2 rounded-lg bg-background border border-border"
+                    onChange={(e) => handleUsernameChange(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    onFocus={() => {
+                      // Show dropdown if there's text and we have results
+                      if (newMemberUsername.trim() && filteredUsers.length > 0) {
+                        setShowUserDropdown(true)
+                      }
+                    }}
+                    onBlur={() => {
+                      // Delay hiding to allow click on dropdown items
+                      setTimeout(() => setShowUserDropdown(false), 150)
+                    }}
+                    placeholder="Start typing username..."
+                    className="w-full px-4 py-2 rounded-lg bg-background border border-border focus:ring-2 focus:ring-primary focus:border-transparent"
+                    autoComplete="off"
                   />
+                  
+                  {/* User Dropdown */}
+                  {showUserDropdown && (
+                    <div 
+                      ref={dropdownRef}
+                      className="absolute z-50 w-full mt-1 bg-gray-800 border border-gray-700 rounded-lg shadow-xl max-h-48 overflow-y-auto"
+                      style={{ 
+                        top: '100%',
+                        backgroundColor: '#1f2937',
+                        border: '1px solid #374151'
+                      }}
+                    >
+                      {filteredUsers.length > 0 ? (
+                        filteredUsers.map((user, index) => {
+                          const isExistingMember = members.some(m => m.username === user.username)
+                          return (
+                            <button
+                              key={user.username}
+                              type="button"
+                              onMouseDown={(e) => {
+                                e.preventDefault()
+                                if (!isExistingMember) {
+                                  selectUser(user.username)
+                                }
+                              }}
+                              disabled={isExistingMember}
+                              className={`w-full px-4 py-3 text-left transition-colors border-b border-gray-700 last:border-b-0 ${
+                                isExistingMember 
+                                  ? 'bg-gray-700 text-gray-500 cursor-not-allowed'
+                                  : index === selectedUserIndex 
+                                    ? 'bg-gray-600 hover:bg-gray-600 text-white' 
+                                    : 'bg-gray-800 hover:bg-gray-600 text-white'
+                              }`}
+                            >
+                              <div className="font-medium">
+                                {user.username}
+                                {isExistingMember && (
+                                  <span className="text-xs text-gray-400 ml-2">(already member)</span>
+                                )}
+                              </div>
+                            </button>
+                          )
+                        })
+                      ) : (
+                        <div className="px-4 py-3 text-gray-300 text-sm">
+                          No users found matching "{newMemberUsername}"
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  
+                  {/* Debug info - always show for testing */}
+                  <div className="text-xs text-gray-500 mt-1">
+                    Debug: showDropdown={showUserDropdown.toString()}, users={filteredUsers.length}, members={members.length}, text="{newMemberUsername}"
+                  </div>
                 </div>
                 <div>
                   <label htmlFor="role" className="block text-sm font-medium text-muted-foreground mb-1">
@@ -576,6 +822,8 @@ function PortfolioComponent() {
                     setShowAddMemberModal(false)
                     setNewMemberUsername('')
                     setNewMemberRole('editor')
+                    setShowUserDropdown(false)
+                    setFilteredUsers([])
                   }}
                   className="px-4 py-2 bg-muted text-muted-foreground rounded-lg hover:bg-muted/80"
                 >
@@ -583,7 +831,8 @@ function PortfolioComponent() {
                 </button>
                 <button
                   onClick={handleAddMember}
-                  className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90"
+                  disabled={!newMemberUsername.trim()}
+                  className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Add
                 </button>
@@ -777,4 +1026,4 @@ function PortfolioComponent() {
       </div>
     </div>
   )
-} 
+}
