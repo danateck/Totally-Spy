@@ -52,68 +52,81 @@ function RouteComponent() {
   }
 
   return (
-    <div className="min-h-screen bg-background text-foreground"
+    <div className="h-screen bg-background text-foreground overflow-hidden flex flex-col"
     style={{ backgroundImage: "url('/images/background.jpg')" }}>
-      <div className="container mx-auto px-4 py-8">
+      
+      {/* Header with Logo */}
+      <div className="flex-shrink-0 px-4 py-4">
         <Logo />
+      </div>
 
-        <div className="max-w-4xl mx-auto bg-card border border-border rounded-xl shadow-2xl p-8">
-          <div className="flex flex-col items-center space-y-6">
-            {showAlert && (
-              <Alert className="w-full max-w-2xl border border-green-500/20 bg-green-500/10">
+      {/* Main Content Area */}
+      <div className="flex-1 px-4 pb-20 flex flex-col min-h-0">
+        <div className="bg-card border border-border rounded-xl shadow-2xl p-4 flex-1 flex flex-col min-h-0">
+          
+          {/* Alert */}
+          {showAlert && (
+            <div className="flex-shrink-0 mb-4">
+              <Alert className="border border-green-500/20 bg-green-500/10">
                 <AlertTitle className="text-green-400">{alertTitle}</AlertTitle>
                 <AlertDescription className="text-green-400">{alertMessage}</AlertDescription>
               </Alert>
-            )}
+            </div>
+          )}
 
+          {/* Camera/Content Area */}
+          <div className="flex-1 flex flex-col items-center justify-center min-h-0">
             {isRecording ? (
-              <div className="w-full max-w-2xl">
-                <WebcamCapture
-                  onCapture={handleCapture}
-                  isRecording={isRecording}
-                />
+              <div className="w-full h-full flex flex-col">
+                <div className="flex-1 min-h-0">
+                  <WebcamCapture
+                    onCapture={handleCapture}
+                    isRecording={isRecording}
+                  />
+                </div>
+                <div className="flex-shrink-0 flex justify-center mt-4">
+                  <button
+                    onClick={handleStopRecording}
+                    className="px-8 py-3 bg-destructive hover:bg-red-600 text-white rounded-lg font-semibold transition-all duration-200"
+                  >
+                    Stop Recording
+                  </button>
+                </div>
               </div>
             ) : capturedImage ? (
-              <img
-                src={capturedImage}
-                alt="Captured"
-                className="w-full max-w-2xl rounded-lg shadow-lg"
-              />
+              <div className="flex flex-col items-center space-y-4 h-full justify-center">
+                <img
+                  src={capturedImage}
+                  alt="Captured"
+                  className="max-w-full max-h-[60%] object-contain rounded-lg shadow-lg"
+                />
+                <button
+                  onClick={handleStartRecording}
+                  className="px-6 py-3 rounded-lg font-semibold transition-all duration-200 bg-primary hover:bg-accent hover:text-accent-foreground"
+                >
+                  Start Recording
+                </button>
+              </div>
             ) : (
-              <div className="w-24 h-24 rounded-full bg-muted flex items-center justify-center">
-                <div className="w-16 h-16 rounded-full bg-muted-foreground" />
+              <div className="flex flex-col items-center space-y-6">
+                <div className="w-24 h-24 rounded-full bg-muted flex items-center justify-center">
+                  <div className="w-16 h-16 rounded-full bg-muted-foreground" />
+                </div>
+                <button
+                  onClick={handleStartRecording}
+                  className="px-6 py-3 rounded-lg font-semibold transition-all duration-200 bg-primary hover:bg-accent hover:text-accent-foreground"
+                >
+                  Start Recording
+                </button>
               </div>
             )}
-
-            <div className="flex space-x-4">
-              <button
-                onClick={handleStartRecording}
-                disabled={isRecording}
-                className={`px-6 py-3 rounded-lg font-semibold transition-all duration-200 ${
-                  isRecording
-                    ? 'bg-muted cursor-not-allowed'
-                    : 'bg-primary hover:bg-accent hover:text-accent-foreground'
-                }`}
-              >
-                Start
-              </button>
-
-              <button
-                onClick={handleStopRecording}
-                disabled={!isRecording}
-                className={`px-6 py-3 rounded-lg font-semibold transition-all duration-200 ${
-                  !isRecording
-                    ? 'bg-muted cursor-not-allowed'
-                    : 'bg-destructive hover:bg-red-600 text-white'
-                }`}
-              >
-                Stop
-              </button>
-            </div>
           </div>
         </div>
+      </div>
 
-        <div className="fixed bottom-8 left-0 right-0 flex justify-center space-x-4">
+      {/* Fixed Bottom Navigation - Hidden when recording */}
+      {!isRecording && (
+        <div className="flex-shrink-0 absolute bottom-4 left-0 right-0 flex justify-center space-x-4 px-4">
           <Link
             to="/dashboard"
             className="px-6 py-3 bg-muted hover:bg-muted-foreground rounded-lg font-semibold transition-all duration-200 flex items-center text-foreground"
@@ -127,7 +140,7 @@ function RouteComponent() {
             Forward <span className="ml-2">→</span>
           </Link>
         </div>
-      </div>
+      )}
     </div>
   )
 }
