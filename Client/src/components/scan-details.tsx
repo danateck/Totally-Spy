@@ -40,6 +40,7 @@ export function ScanDetails({ id, name, date, showAddToPortfolio, onAddToPortfol
       <Link
         to="/history/$item"
         params={{ item: String(id) }}
+        preload={false}
         className="block w-full p-4 bg-card rounded-xl shadow-lg hover:shadow-xl transition-all duration-200 border border-border hover:border-accent text-left group"
       >
         <div className="flex items-center justify-between">

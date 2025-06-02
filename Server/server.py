@@ -1676,6 +1676,19 @@ async def serve_spa(full_path: str):
     else:
         raise HTTPException(status_code=404, detail="index.html not found")
     
+    
+class BestFrameData(BaseModel):
+    scanId: int
+    image: str  # base64 string
+
+@app.post("/api/scan/save_best_frame")
+async def save_best_frame(data: BestFrameData, user: User = Depends(get_current_user)):
+    try:
+        save_best_frame_to_db(data.scanId, user.id, data.image)
+        return {"message": "Best frame saved successfully"}
+    except Exception as e:
+        logger.error(f"Error saving best frame: {e}")
+        raise HTTPException(status_code=500, detail="Failed to save best frame")
 
 
 
