@@ -1,5 +1,6 @@
 export interface ApiResponseFoundCode {
   message: string[];
+  scan_id?: number;
 }
 
 export interface UserLogin {

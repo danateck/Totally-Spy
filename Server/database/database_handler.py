@@ -533,7 +533,7 @@ def insert_user(username: str, password: str) -> int | None:
         finally:
             conn.close()
 
-def insert_scan(username: str, detected_text: str) -> None:
+def insert_scan(username: str, detected_text: str) -> Optional[int]:
     conn = get_db_connection()
     if conn:
         try: 
@@ -548,22 +548,26 @@ def insert_scan(username: str, detected_text: str) -> None:
                 encrypted_text = encrypt_data(user_id, detected_text)
                 if encrypted_text is None:
                     logger.warning("Encryption failed!")
-                    return
+                    return None
                 
                 # Create a default name with formatted date (e.g., "21 Apr 2025 07:46 Recording")
                 current_time = datetime.now()
                 default_name = f"{current_time.strftime('%d %b %Y %H:%M')} Recording"
                 
                 cur.execute(
-                    "INSERT INTO scan_history (user_id, detected_text, name) VALUES (%s, %s, %s);",
+                    "INSERT INTO scan_history (user_id, detected_text, name) VALUES (%s, %s, %s) RETURNING id;",
                     (user_id, encrypted_text, default_name)
                 )
+                scan_id = cur.fetchone()[0]
                 conn.commit()
-                logger.info(f"Scan history added successfully!")
+                logger.info(f"Scan history added successfully with ID: {scan_id}")
+                return scan_id
         except psycopg2.Error as e:
             logger.error(f"Error inserting scan history: {e}")
+            return None
         finally:
             conn.close()
+    return None
 
 
 
