@@ -639,24 +639,46 @@ def get_scan_history(username: str) -> list[tuple[int, str, str]]:
                     cur.execute("""
                         SELECT id, scan_time, detected_text, name 
                         FROM scan_history 
-                        WHERE user_id = %s;
+                        WHERE user_id = %s
+                        ORDER BY scan_time DESC;
                     """, (user_id,))
                     scans = cur.fetchall()
-                    # Filter out records with empty decrypted data
+                    
+                    # Check if scans were found
+                    if not scans:
+                        logger.info(f"No scan history found for user: {username}")
+                        return []
+                    
+                    # Process records with proper error handling
                     decrypted_scans = []
                     for scan in scans:
-                        decrypted_text = decrypt_data(user_id, scan[2])
-                        if decrypted_text and decrypted_text.strip():  # Check if decrypted text exists and is not just whitespace
-                            decrypted_scans.append((scan[0], scan[1], scan[3]))  # Use scan[3] for name
+                        try:
+                            decrypted_text = decrypt_data(user_id, scan[2])
+                            # Check if decryption was successful (not None)
+                            if decrypted_text is not None:
+                                # Return (id, scan_time, name) - using scan[3] for name
+                                decrypted_scans.append((scan[0], scan[1], scan[3] or "Unnamed"))
+                            else:
+                                # Skip records with decryption failures
+                                logger.warning(f"Skipping scan {scan[0]} due to decryption failure")
+                        except Exception as decrypt_error:
+                            logger.warning(f"Error decrypting scan {scan[0]}: {decrypt_error}")
+                            # Skip records with decryption errors
+                            continue
+                    
                     return decrypted_scans
                 else:
-                    logger.warning("No user found")
+                    logger.warning(f"No user found with username: {username}")
                     return []
         except Exception as e:
-            logger.error(f"Error fetching scan history: {e}")
+            logger.error(f"Error fetching scan history for {username}: {e}")
+            return []  # Return empty list instead of None
         finally:
             conn.close()
-    return []
+    else:
+        logger.error("Failed to get database connection")
+        return []  # Return empty list if no connection
+
 
 def get_scan_history_by_id(user_id: int, record_id: int) -> list[tuple[int, str, str]]:
     conn = get_db_connection()
@@ -665,14 +687,24 @@ def get_scan_history_by_id(user_id: int, record_id: int) -> list[tuple[int, str,
             with conn.cursor() as cur:
                 cur.execute("SELECT id, scan_time, detected_text FROM scan_history WHERE id = %s;", (record_id,))
                 scan = cur.fetchone()
-                decrypted_scan = [(scan[0], scan[1], decrypt_data(user_id, scan[2]))]
-                return decrypted_scan
+                if scan:
+                    # Decrypt the data and check if successful
+                    decrypted_text = decrypt_data(user_id, scan[2])
+                    if decrypted_text is not None:
+                        decrypted_scan = [(scan[0], scan[1], decrypted_text)]
+                        return decrypted_scan
+                    else:
+                        logger.warning(f"Failed to decrypt scan with id {record_id}")
+                        return []
+                else:
+                    logger.warning(f"No scan found with id {record_id}")
+                    return []
         except Exception as e:
             logger.error(f"Error fetching scan history: {e}")
+            return []
         finally:
             conn.close()
-
-
+    return []
 def create_session_table():
     conn = get_db_connection()
     if conn:
