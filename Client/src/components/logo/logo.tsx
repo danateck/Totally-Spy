@@ -5,6 +5,7 @@ export interface LogoProps {
   className?: string
 }
 
+//logo details
 export function Logo({ className }: LogoProps) {
   return (
     <div className={cn("flex items-center justify-center", className)}>
