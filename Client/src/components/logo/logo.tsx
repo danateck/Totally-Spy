@@ -1,16 +1,17 @@
 import { cn } from "@/lib/utils"
+import { Search } from "lucide-react"
 
-export interface LogoProps {    
+export interface LogoProps {
   className?: string
 }
 
 export function Logo({ className }: LogoProps) {
   return (
-      <h1 className={cn(
-      'text-4xl py-2 font-bold text-center text-transparent bg-clip-text bg-gradient-to-r from-green-400 to-green-600',
-      className
-    )}>
-      TotallySpy
-    </h1>
+    <div className={cn("flex items-center justify-center", className)}>
+      <Search size={28} className="text-green-500 mr-2" />
+      <h1 className="text-4xl font-bold leading-tight text-transparent bg-clip-text bg-gradient-to-r from-green-400 to-green-600">
+        TotallySpy
+      </h1>
+    </div>
   )
 }
