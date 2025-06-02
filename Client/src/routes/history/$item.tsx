@@ -4,6 +4,8 @@ import { useAuth } from '@/hooks/useAuth.ts'
 import { Logo } from '@/components/logo/logo'
 import type { Record, RecordResponse } from '@/lib/api'
 import { Button } from '@/components/ui/button'
+import { Eye, ArrowRight } from 'lucide-react' // Add these imports
+import EnhancedOSINTDisplay from '@/components/OSINT' // Add OSINT component import
 
 function formatDate(dateString: string): string {
   const date = new Date(dateString);
@@ -105,7 +107,69 @@ function RouteComponent() {
   const [error, setError] = useState<string | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
   const [showModal, setShowModal] = useState(false)
+  const [showOSINT, setShowOSINT] = useState(false)
   const params = Route.useParams()
+  
+  // Handle OSINT enhancement
+  const handleOSINTEnhance = async () => {
+  try {
+    console.log(`⚡ Starting QUICK OSINT enhancement for scan ${params.item}`);
+    
+    // Use the new quick OSINT endpoint for speed
+    const quickResponse = await fetch(`/api/quick-osint/${params.item}`, {
+      method: 'POST',
+      credentials: 'include'
+    });
+    
+    if (quickResponse.ok) {
+      const quickData = await quickResponse.json();
+      console.log('⚡ Quick OSINT results:', quickData);
+      
+      if (quickData.success) {
+        console.log('✅ Quick enhancement completed in under 10 seconds!');
+        console.log(`📊 Performance: ${quickData.performance?.estimated_time}`);
+        console.log(`🔍 Generated ${quickData.performance?.results_generated} results`);
+        setShowOSINT(true);
+        return;
+      } else {
+        console.error('❌ Quick OSINT failed:', quickData.message);
+        // Fall back to regular enhancement
+        console.log('⚠️ Falling back to regular enhancement...');
+      }
+    } else {
+      console.log('⚠️ Quick mode failed, trying regular enhancement...');
+    }
+    
+    // Fallback: Use force refresh (slower but more comprehensive)
+    console.log(`🔄 Using comprehensive enhancement as fallback...`);
+    const refreshResponse = await fetch(`/api/force-refresh-osint/${params.item}`, {
+      method: 'POST',
+      credentials: 'include'
+    });
+    
+    if (refreshResponse.ok) {
+      const refreshData = await refreshResponse.json();
+      console.log('✅ Comprehensive enhancement results:', refreshData);
+      
+      if (refreshData.success) {
+        console.log('✅ Comprehensive enhancement completed');
+        setShowOSINT(true);
+        return;
+      }
+    }
+    
+    // Final fallback
+    alert('Enhancement failed. Please try again.');
+    
+  } catch (error) {
+    console.error('❌ Enhancement error:', error);
+    alert(`Enhancement error: ${error}`);
+  }
+};
+
+  const handleBackFromOSINT = () => {
+    setShowOSINT(false);
+  };
   
   // Handle modal open
   const handleDeleteClick = () => {
@@ -182,6 +246,16 @@ function RouteComponent() {
     )
   }
 
+  // Show OSINT component if requested
+  if (showOSINT) {
+    return (
+      <EnhancedOSINTDisplay 
+        scanId={parseInt(params.item)} 
+        onClose={handleBackFromOSINT}
+      />
+    );
+  }
+
   const record = data.record[0];
   const rows = getAllRows(record[2]);
 
@@ -222,7 +296,23 @@ function RouteComponent() {
               </div>
             </div>
             
-            <div className="pt-4 border-t border-border">
+            <div className="pt-4 border-t border-border space-y-3">
+              <div className="flex flex-col items-end gap-2">
+                <button
+                  onClick={handleOSINTEnhance}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                >
+                  <Eye className="w-4 h-4" />
+                  Enhance with OSINT
+                  <ArrowRight className="w-4 h-4" />
+                </button>
+                
+                <div className="text-xs text-gray-500 text-center">
+                  Click to start OSINT<br />
+                  intelligence gathering
+                </div>
+              </div>
+              
               <Button
                 onClick={handleDeleteClick}
                 disabled={isDeleting}

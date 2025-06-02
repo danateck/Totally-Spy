@@ -15,9 +15,11 @@ import { Route as IndexImport } from './routes/index'
 import { Route as SignupIndexImport } from './routes/signup/index'
 import { Route as RecordIndexImport } from './routes/record/index'
 import { Route as ProfileIndexImport } from './routes/profile/index'
+import { Route as MyRequestsIndexImport } from './routes/my-requests/index'
 import { Route as LoginIndexImport } from './routes/login/index'
 import { Route as HistoryIndexImport } from './routes/history/index'
 import { Route as DashboardIndexImport } from './routes/dashboard/index'
+import { Route as PortfolioIdImport } from './routes/portfolio/$id'
 import { Route as HistoryItemImport } from './routes/history/$item'
 
 // Create/Update Routes
@@ -46,6 +48,12 @@ const ProfileIndexRoute = ProfileIndexImport.update({
   getParentRoute: () => rootRoute,
 } as any)
 
+const MyRequestsIndexRoute = MyRequestsIndexImport.update({
+  id: '/my-requests/',
+  path: '/my-requests/',
+  getParentRoute: () => rootRoute,
+} as any)
+
 const LoginIndexRoute = LoginIndexImport.update({
   id: '/login/',
   path: '/login/',
@@ -61,6 +69,12 @@ const HistoryIndexRoute = HistoryIndexImport.update({
 const DashboardIndexRoute = DashboardIndexImport.update({
   id: '/dashboard/',
   path: '/dashboard/',
+  getParentRoute: () => rootRoute,
+} as any)
+
+const PortfolioIdRoute = PortfolioIdImport.update({
+  id: '/portfolio/$id',
+  path: '/portfolio/$id',
   getParentRoute: () => rootRoute,
 } as any)
 
@@ -88,6 +102,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof HistoryItemImport
       parentRoute: typeof rootRoute
     }
+    '/portfolio/$id': {
+      id: '/portfolio/$id'
+      path: '/portfolio/$id'
+      fullPath: '/portfolio/$id'
+      preLoaderRoute: typeof PortfolioIdImport
+      parentRoute: typeof rootRoute
+    }
     '/dashboard/': {
       id: '/dashboard/'
       path: '/dashboard'
@@ -107,6 +128,13 @@ declare module '@tanstack/react-router' {
       path: '/login'
       fullPath: '/login'
       preLoaderRoute: typeof LoginIndexImport
+      parentRoute: typeof rootRoute
+    }
+    '/my-requests/': {
+      id: '/my-requests/'
+      path: '/my-requests'
+      fullPath: '/my-requests'
+      preLoaderRoute: typeof MyRequestsIndexImport
       parentRoute: typeof rootRoute
     }
     '/profile/': {
@@ -138,9 +166,11 @@ declare module '@tanstack/react-router' {
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/history/$item': typeof HistoryItemRoute
+  '/portfolio/$id': typeof PortfolioIdRoute
   '/dashboard': typeof DashboardIndexRoute
   '/history': typeof HistoryIndexRoute
   '/login': typeof LoginIndexRoute
+  '/my-requests': typeof MyRequestsIndexRoute
   '/profile': typeof ProfileIndexRoute
   '/record': typeof RecordIndexRoute
   '/signup': typeof SignupIndexRoute
@@ -149,9 +179,11 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/history/$item': typeof HistoryItemRoute
+  '/portfolio/$id': typeof PortfolioIdRoute
   '/dashboard': typeof DashboardIndexRoute
   '/history': typeof HistoryIndexRoute
   '/login': typeof LoginIndexRoute
+  '/my-requests': typeof MyRequestsIndexRoute
   '/profile': typeof ProfileIndexRoute
   '/record': typeof RecordIndexRoute
   '/signup': typeof SignupIndexRoute
@@ -161,9 +193,11 @@ export interface FileRoutesById {
   __root__: typeof rootRoute
   '/': typeof IndexRoute
   '/history/$item': typeof HistoryItemRoute
+  '/portfolio/$id': typeof PortfolioIdRoute
   '/dashboard/': typeof DashboardIndexRoute
   '/history/': typeof HistoryIndexRoute
   '/login/': typeof LoginIndexRoute
+  '/my-requests/': typeof MyRequestsIndexRoute
   '/profile/': typeof ProfileIndexRoute
   '/record/': typeof RecordIndexRoute
   '/signup/': typeof SignupIndexRoute
@@ -174,9 +208,11 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/history/$item'
+    | '/portfolio/$id'
     | '/dashboard'
     | '/history'
     | '/login'
+    | '/my-requests'
     | '/profile'
     | '/record'
     | '/signup'
@@ -184,9 +220,11 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/history/$item'
+    | '/portfolio/$id'
     | '/dashboard'
     | '/history'
     | '/login'
+    | '/my-requests'
     | '/profile'
     | '/record'
     | '/signup'
@@ -194,9 +232,11 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/history/$item'
+    | '/portfolio/$id'
     | '/dashboard/'
     | '/history/'
     | '/login/'
+    | '/my-requests/'
     | '/profile/'
     | '/record/'
     | '/signup/'
@@ -206,9 +246,11 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   HistoryItemRoute: typeof HistoryItemRoute
+  PortfolioIdRoute: typeof PortfolioIdRoute
   DashboardIndexRoute: typeof DashboardIndexRoute
   HistoryIndexRoute: typeof HistoryIndexRoute
   LoginIndexRoute: typeof LoginIndexRoute
+  MyRequestsIndexRoute: typeof MyRequestsIndexRoute
   ProfileIndexRoute: typeof ProfileIndexRoute
   RecordIndexRoute: typeof RecordIndexRoute
   SignupIndexRoute: typeof SignupIndexRoute
@@ -217,9 +259,11 @@ export interface RootRouteChildren {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   HistoryItemRoute: HistoryItemRoute,
+  PortfolioIdRoute: PortfolioIdRoute,
   DashboardIndexRoute: DashboardIndexRoute,
   HistoryIndexRoute: HistoryIndexRoute,
   LoginIndexRoute: LoginIndexRoute,
+  MyRequestsIndexRoute: MyRequestsIndexRoute,
   ProfileIndexRoute: ProfileIndexRoute,
   RecordIndexRoute: RecordIndexRoute,
   SignupIndexRoute: SignupIndexRoute,
@@ -237,9 +281,11 @@ export const routeTree = rootRoute
       "children": [
         "/",
         "/history/$item",
+        "/portfolio/$id",
         "/dashboard/",
         "/history/",
         "/login/",
+        "/my-requests/",
         "/profile/",
         "/record/",
         "/signup/"
@@ -251,6 +297,9 @@ export const routeTree = rootRoute
     "/history/$item": {
       "filePath": "history/$item.tsx"
     },
+    "/portfolio/$id": {
+      "filePath": "portfolio/$id.tsx"
+    },
     "/dashboard/": {
       "filePath": "dashboard/index.tsx"
     },
@@ -259,6 +308,9 @@ export const routeTree = rootRoute
     },
     "/login/": {
       "filePath": "login/index.tsx"
+    },
+    "/my-requests/": {
+      "filePath": "my-requests/index.tsx"
     },
     "/profile/": {
       "filePath": "profile/index.tsx"
