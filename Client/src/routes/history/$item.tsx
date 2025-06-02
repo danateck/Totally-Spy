@@ -298,14 +298,16 @@ function RouteComponent() {
             
             <div className="pt-4 border-t border-border space-y-3">
               <div className="flex flex-col items-end gap-2">
-                <button
-                  onClick={handleOSINTEnhance}
-                  className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                >
-                  <Eye className="w-4 h-4" />
-                  Enhance with OSINT
-                  <ArrowRight className="w-4 h-4" />
-                </button>
+               <button
+               onClick={handleOSINTEnhance}
+              className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+>
+
+              <Eye className="w-4 h-4" />
+               Enhance with OSINT
+              <ArrowRight className="w-4 h-4" />
+              </button>
+
                 
                 <div className="text-xs text-gray-500 text-center">
                   Click to start OSINT<br />
