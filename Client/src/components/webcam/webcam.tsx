@@ -1,17 +1,15 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import Webcam from "react-webcam";
-import { ZoomIn, ZoomOut, Maximize, Minimize, Focus, Settings, RotateCcw, Camera, RefreshCw } from "lucide-react";
+import { ZoomIn, ZoomOut, Maximize, Minimize, Focus, Settings, RotateCcw, Camera, RefreshCw, X } from "lucide-react";
 import { getFilterStyle, processImage } from "@/lib/image-processing";
 import type { QualityLevel } from "@/lib/image-processing";
-
-// No need for custom interface as we're using 'any' type for constraints
-// to bypass TypeScript limitations with the browser APIs
 
 const WebcamCapture: React.FC<{
   onCapture?: (imageSrc: string) => void;
   isRecording: boolean;
+  onToggleRecording?: () => void;
   initialQuality?: QualityLevel;
-}> = ({ onCapture, isRecording, initialQuality = "high" }) => {
+}> = ({ onCapture, isRecording, onToggleRecording, initialQuality = "high" }) => {
   const webcamRef = useRef<Webcam>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -27,6 +25,19 @@ const WebcamCapture: React.FC<{
       videoRef.current = webcamRef.current.video;
     }
   }, [webcamRef.current]);
+
+  // State to track screen size for responsive behavior
+  const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' ? window.innerWidth < 768 : false);
+
+  // Listen for window resize to update mobile state
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
   
   // Quality and enhancement settings
   const [quality, setQuality] = useState(initialQuality);
@@ -35,6 +46,7 @@ const WebcamCapture: React.FC<{
   const [showSettings, setShowSettings] = useState(false);
   
   // Camera state
+  const [isCameraActive, setIsCameraActive] = useState(true);
   const [facingMode, setFacingMode] = useState<"user" | "environment">("environment");
   const [availableCameras, setAvailableCameras] = useState<MediaDeviceInfo[]>([]);
   const [selectedCameraId, setSelectedCameraId] = useState<string>("");
@@ -51,21 +63,21 @@ const WebcamCapture: React.FC<{
   
   // Get initial video constraints
   const getVideoConstraints = useCallback(() => {
+    if (!isCameraActive) return false;
+    
     const constraints: any = {
-      width: { ideal: 3840 }, // 4K resolution for maximum quality when zooming
+      width: { ideal: 3840 },
       height: { ideal: 2160 },
       aspectRatio: 16/9,
       frameRate: { ideal: 30, max: 60 },
     };
 
-    // Add device ID if we have one selected
     if (selectedCameraId) {
       constraints.deviceId = selectedCameraId;
     } else {
       constraints.facingMode = facingMode;
     }
 
-    // Try to add optical zoom if supported
     if (opticalZoomSupported) {
       if (!constraints.advanced) {
         constraints.advanced = [];
@@ -74,7 +86,7 @@ const WebcamCapture: React.FC<{
     }
 
     return constraints;
-  }, [facingMode, selectedCameraId, zoomLevel, opticalZoomSupported]);
+  }, [facingMode, selectedCameraId, zoomLevel, opticalZoomSupported, isCameraActive]);
 
   // Load available cameras
   const loadCameras = useCallback(async () => {
@@ -84,16 +96,13 @@ const WebcamCapture: React.FC<{
       const videoDevices = devices.filter(device => device.kind === 'videoinput');
       setAvailableCameras(videoDevices);
       
-      // If we found cameras and don't have one selected, pick the first
       if (videoDevices.length > 0 && !selectedCameraId) {
-        // Try to find the environment camera first
         const environmentCamera = videoDevices.find(device => 
           device.label.toLowerCase().includes('back') || 
           device.label.toLowerCase().includes('rear') ||
           device.label.toLowerCase().includes('environment')
         );
         
-        // If we found an environment camera, use it, otherwise use the first camera
         setSelectedCameraId(environmentCamera?.deviceId || videoDevices[0].deviceId);
       }
     } catch (error) {
@@ -103,7 +112,6 @@ const WebcamCapture: React.FC<{
     }
   }, [selectedCameraId]);
 
-  // Immediately check for available cameras on component mount
   useEffect(() => {
     loadCameras();
   }, []);
@@ -118,11 +126,9 @@ const WebcamCapture: React.FC<{
         if (tracks.length > 0) {
           const capabilities = tracks[0].getCapabilities();
           
-          // Check if zoom capability exists and get its range
           if (capabilities && 'zoom' in capabilities) {
             setOpticalZoomSupported(true);
             
-            // Access zoom capability max value (with type safety)
             const zoomCapability = capabilities as any;
             const maxZoom = zoomCapability.zoom?.max || 10;
             setMaxOpticalZoom(maxZoom);
@@ -157,12 +163,10 @@ const WebcamCapture: React.FC<{
       const videoTrack = mediaStreamRef.current.getVideoTracks()[0];
       if (!videoTrack) return;
 
-      // Use any type to bypass TypeScript restrictions since the constraint is supported by browsers
       const constraints: any = {
         advanced: [{ zoom: newZoomLevel }]
       };
 
-      // Apply the new constraints to the track
       await videoTrack.applyConstraints(constraints);
       console.log(`Applied optical zoom: ${newZoomLevel}`);
     } catch (error) {
@@ -183,18 +187,16 @@ const WebcamCapture: React.FC<{
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d', { 
       alpha: false,
-      willReadFrequently: true  // Add this for better performance when reading canvas data
+      willReadFrequently: true
     });
     if (!ctx) return;
 
-    // Wait for video to be ready
     if (video.videoWidth === 0 || video.videoHeight === 0) {
       console.warn('Video not ready yet');
       return;
     }
     
-    // Calculate target dimensions while maintaining aspect ratio
-    const maxDimension = 2000; // Maximum width or height
+    const maxDimension = 2000;
     let targetWidth = video.videoWidth;
     let targetHeight = video.videoHeight;
     
@@ -208,18 +210,14 @@ const WebcamCapture: React.FC<{
       }
     }
     
-    // Set canvas dimensions to target size
     canvas.width = targetWidth;
     canvas.height = targetHeight;
     
-    // Enable image smoothing for better quality
     ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = 'high';
     
-    // Draw the video frame at target size
     ctx.drawImage(video, 0, 0, targetWidth, targetHeight);
     
-    // Process the image with all enhancements
     processImage(
       ctx,
       targetWidth,
@@ -232,7 +230,6 @@ const WebcamCapture: React.FC<{
       opticalZoomSupported
     );
     
-    // Get the enhanced image with good quality from the processed context
     const imageSrc = canvas.toDataURL('image/jpeg', 0.95);
     processedImageRef.current = imageSrc;
   }, [webcamRef, canvasRef, videoRef, quality, sharpness, enhancementLevel, zoomLevel, position, opticalZoomSupported]);
@@ -252,7 +249,6 @@ const WebcamCapture: React.FC<{
     setZoomLevel(prev => {
       const newZoom = Math.max(prev - 0.25, 1);
       
-      // Reset position if zooming back to 1 and not using optical zoom
       if (newZoom === 1 && !opticalZoomSupported) {
         setPosition({ x: 0, y: 0 });
       }
@@ -290,21 +286,36 @@ const WebcamCapture: React.FC<{
     }
   };
 
+  // Toggle camera on/off
+  const toggleCameraActive = () => {
+    if (isCameraActive) {
+      // Stop the camera
+      if (mediaStreamRef.current) {
+        mediaStreamRef.current.getTracks().forEach(track => track.stop());
+        mediaStreamRef.current = null;
+      }
+      setIsCameraActive(false);
+      // Also stop recording if active
+      if (isRecording && onToggleRecording) {
+        onToggleRecording();
+      }
+    } else {
+      // Restart the camera
+      setIsCameraActive(true);
+    }
+  };
+
   // Toggle camera between front and back
   const toggleCamera = () => {
     const newFacingMode = facingMode === "user" ? "environment" : "user";
     setFacingMode(newFacingMode);
-    setSelectedCameraId(""); // Clear specific camera selection when toggling
-    
-    // Reset zoom when switching cameras
+    setSelectedCameraId("");
     handleResetCamera();
   };
 
   // Select a specific camera by ID
   const selectCamera = (deviceId: string) => {
     setSelectedCameraId(deviceId);
-    
-    // Reset zoom when switching cameras
     handleResetCamera();
   };
 
@@ -329,7 +340,6 @@ const WebcamCapture: React.FC<{
     const deltaY = e.clientY - dragStart.y;
     
     setPosition(prev => {
-      // Calculate bounds for panning
       const maxOffset = (zoomLevel - 1) * 100;
       const newX = Math.max(Math.min(prev.x + deltaX, maxOffset), -maxOffset);
       const newY = Math.max(Math.min(prev.y + deltaY, maxOffset), -maxOffset);
@@ -348,12 +358,10 @@ const WebcamCapture: React.FC<{
   // Handle recording interval
   useEffect(() => {
     if (isRecording) {
-      // Capture immediately when recording starts
       capture();
       
       intervalRef.current = window.setInterval(() => {
         const now = Date.now();
-        // Capture and send image every 750ms
         capture();
         if (processedImageRef.current && onCapture) {
           onCapture(processedImageRef.current);
@@ -401,20 +409,16 @@ const WebcamCapture: React.FC<{
         const videoTrack = mediaStreamRef.current.getVideoTracks()[0];
         if (!videoTrack) return;
         
-        // Cast to any to bypass TypeScript constraints since browser APIs 
-        // support more capabilities than TypeScript types currently define
         const constraints: any = {
           advanced: [{ 
             focusMode: newAutoFocus ? 'continuous' : 'manual'
           }]
         };
         
-        // Try to apply the constraints
         videoTrack.applyConstraints(constraints)
           .catch(err => {
             console.log("Could not set focus mode, trying alternative method");
             
-            // Try alternative constraint name if first one fails
             const altConstraints: any = {
               advanced: [{ 
                 focus: newAutoFocus ? 'continuous' : 'manual'
@@ -443,56 +447,66 @@ const WebcamCapture: React.FC<{
   };
 
   return (
-    <div className="space-y-4">
+    <div className={`relative w-full overflow-hidden ${isMobile ? 'h-screen max-h-screen' : 'h-screen'}`}>
       {/* Hidden canvas for processing */}
       <canvas ref={canvasRef} className="hidden" />
       
+      {/* Main camera view - optimized for mobile */}
       <div 
         ref={containerRef}
-        className="relative overflow-hidden rounded-lg shadow-lg"
+        className={`absolute inset-0 w-full ${isMobile ? 'h-full' : 'h-full'}`}
         style={{ 
-          width: '100%', 
-          height: '720px',
-          cursor: (zoomLevel > 1 && !opticalZoomSupported) ? 'move' : 'default'
+          cursor: (zoomLevel > 1 && !opticalZoomSupported) ? 'move' : 'default',
+          // On mobile, account for the bottom controls by reducing height
+          height: isMobile ? 'calc(100vh - 120px)' : '100%'
         }}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseUp}
       >
-        {/* Zoom indicator */}
-        <div className="absolute top-4 left-4 bg-black bg-opacity-50 text-white px-3 py-1 rounded-full text-sm font-medium z-10">
-          {Math.round(zoomLevel * 100)}% {opticalZoomSupported ? '(Optical)' : ''}
+        {/* Top overlay indicators */}
+        <div className={`absolute ${isMobile ? 'top-2 left-2 right-2' : 'top-4 left-4 right-4'} flex justify-between items-start z-30 pointer-events-none`}>
+          {/* Zoom indicator */}
+          <div className={`bg-black/70 text-white ${isMobile ? 'px-2 py-1 text-xs' : 'px-3 py-1 text-sm'} rounded-full font-medium backdrop-blur-sm`}>
+            {Math.round(zoomLevel * 100)}% {opticalZoomSupported ? '(Optical)' : ''}
+          </div>
+          
+          {/* Quality indicator */}
+          <div className={`bg-black/70 text-white ${isMobile ? 'px-2 py-1 text-xs' : 'px-3 py-1 text-sm'} rounded-full font-medium backdrop-blur-sm`}>
+            {quality === "ultra" ? "ULTRA HD" : quality === "high" ? "HD" : "Standard"}
+          </div>
         </div>
         
-        {/* Camera controls */}
-        <div className="absolute top-4 right-20 flex space-x-2 z-20">
+        {/* Camera controls - top right - compact on mobile */}
+        <div className={`absolute ${isMobile ? 'top-2 right-2' : 'top-4 right-4'} flex space-x-1 z-40`}>
           <button 
             onClick={toggleCamera}
-            className="p-2 rounded-full bg-black/80 text-white hover:bg-black/90 backdrop-blur-sm"
+            className={`${isMobile ? 'p-2' : 'p-3'} rounded-full bg-black/70 text-white hover:bg-black/80 backdrop-blur-sm transition-all`}
             title="Switch Camera"
           >
-            <RefreshCw size={20} />
+            <RefreshCw size={isMobile ? 16 : 20} />
           </button>
           
           <button 
             onClick={toggleSettings}
-            className="p-2 rounded-full bg-black/80 text-white hover:bg-black/90 backdrop-blur-sm"
+            className={`${isMobile ? 'p-2' : 'p-3'} rounded-full backdrop-blur-sm transition-all ${
+              showSettings 
+                ? 'bg-blue-500 text-white' 
+                : 'bg-black/70 text-white hover:bg-black/80'
+            }`}
             title="Settings"
           >
-            <Settings size={20} />
+            <Settings size={isMobile ? 16 : 20} />
           </button>
         </div>
         
-        {/* Quality indicator */}
-        <div className="absolute top-4 right-4 bg-black/80 text-white px-3 py-1 rounded-full text-sm font-medium z-20 backdrop-blur-sm">
-          {quality === "ultra" ? "ULTRA HD" : quality === "high" ? "HD" : "Standard"}
-        </div>
-        
-        {/* Camera indicator */}
-        <div className="absolute bottom-4 left-4 bg-black/80 text-white px-3 py-1 rounded-full text-sm font-medium z-20 backdrop-blur-sm">
-          {facingMode === "environment" ? "Rear Camera" : "Front Camera"}
-        </div>
+        {/* Camera indicator - positioned to avoid extra space */}
+        {isCameraActive && (
+          <div className={`absolute ${isMobile ? 'bottom-2 left-2' : 'bottom-2 left-4'} bg-black/70 text-white ${isMobile ? 'px-2 py-1 text-xs' : 'px-3 py-1 text-sm'} rounded-full font-medium z-30 backdrop-blur-sm pointer-events-none`}>
+            {facingMode === "environment" ? "Rear Camera" : "Front Camera"}
+          </div>
+        )}
         
         <div
           style={{
@@ -506,200 +520,417 @@ const WebcamCapture: React.FC<{
             filter: getFilterStyleForPreview()
           }}
         >
-          <Webcam
-            audio={false}
-            width={3840}
-            height={2160}
-            ref={webcamRef}
-            screenshotFormat="image/jpeg"
-            videoConstraints={getVideoConstraints()}
-            imageSmoothing={true}
-            className="w-full h-full object-cover"
-            forceScreenshotSourceSize
-            onUserMedia={(stream) => {
-              mediaStreamRef.current = stream;
-            }}
-          />
+          {isCameraActive ? (
+            <Webcam
+              audio={false}
+              width={3840}
+              height={2160}
+              ref={webcamRef}
+              screenshotFormat="image/jpeg"
+              videoConstraints={getVideoConstraints()}
+              imageSmoothing={true}
+              className="w-full h-full object-cover"
+              forceScreenshotSourceSize
+              onUserMedia={(stream) => {
+                mediaStreamRef.current = stream;
+              }}
+            />
+          ) : (
+            <div className="w-full h-full bg-black flex items-center justify-center">
+              <div className="text-center text-white">
+                <Camera size={64} className="mx-auto mb-4 opacity-50" />
+                <p className="text-lg font-medium">Camera Stopped</p>
+                <p className="text-sm opacity-70">Press START to resume</p>
+              </div>
+            </div>
+          )}
         </div>
         
         {/* Zoom focus indicator - only for digital zoom */}
         {zoomLevel > 1 && !opticalZoomSupported && (
-          <div className="absolute inset-0 pointer-events-none">
-            <div className="w-24 h-24 border-2 border-white border-opacity-70 rounded-full absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2" />
-            <div className="w-8 h-8 border border-white border-opacity-70 absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 flex items-center justify-center">
-              <div className="w-1 h-8 bg-white bg-opacity-70" />
-              <div className="w-8 h-1 bg-white bg-opacity-70 absolute" />
+          <div className="absolute inset-0 pointer-events-none z-20">
+            <div className={`${isMobile ? 'w-16 h-16' : 'w-24 h-24'} border-2 border-white border-opacity-70 rounded-full absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2`} />
+            <div className={`${isMobile ? 'w-6 h-6' : 'w-8 h-8'} border border-white border-opacity-70 absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 flex items-center justify-center`}>
+              <div className={`w-1 ${isMobile ? 'h-6' : 'h-8'} bg-white bg-opacity-70`} />
+              <div className={`${isMobile ? 'w-6' : 'w-8'} h-1 bg-white bg-opacity-70 absolute`} />
             </div>
           </div>
         )}
       </div>
       
-      {/* Main controls - Zoom only */}
-      <div className="flex items-center justify-center space-x-4 flex-wrap">
-        <button 
-          onClick={handleResetZoom}
-          className="p-2 rounded-full bg-gray-100 text-gray-600 hover:bg-gray-200"
-          title="Reset Zoom"
-        >
-          <Minimize size={24} />
-        </button>
-
-        <button 
-          onClick={handleZoomOut}
-          disabled={zoomLevel <= 1}
-          className={`p-2 rounded-full ${zoomLevel <= 1 ? 'bg-gray-200 text-gray-400' : 'bg-blue-100 text-blue-600 hover:bg-blue-200'}`}
-          title="Zoom Out"
-        >
-          <ZoomOut size={24} />
-        </button>
-        
-        <div className="text-center min-w-20">
-          <span className="font-medium text-gray-700">{Math.round(zoomLevel * 100)}%</span>
-        </div>
-        
-        <button 
-          onClick={handleZoomIn}
-          disabled={zoomLevel >= (opticalZoomSupported ? maxOpticalZoom : 4)}
-          className={`p-2 rounded-full ${zoomLevel >= (opticalZoomSupported ? maxOpticalZoom : 4) ? 'bg-gray-200 text-gray-400' : 'bg-blue-100 text-blue-600 hover:bg-blue-200'}`}
-          title="Zoom In"
-        >
-          <ZoomIn size={24} />
-        </button>
-        
-        <button 
-          onClick={handleMaxZoom}
-          className="p-2 rounded-full bg-gray-100 text-gray-600 hover:bg-gray-200"
-          title="Maximum Zoom"
-        >
-          <Maximize size={24} />
-        </button>
-      </div>
-      
-      {/* Advanced settings panel */}
-      {showSettings && (
-        <div className="p-4 bg-green-500/10 border border-green-500/20 rounded-lg shadow-lg">
-          <h3 className="font-medium text-lg mb-3 text-green-400">Advanced Settings</h3>
-          
-          <div className="space-y-4">
-            {/* Camera selection */}
-            {availableCameras.length > 0 && (
-              <div>
-                <div className="flex items-center justify-between mb-1">
-                  <label className="block text-sm font-medium text-green-400">Select Camera</label>
-                  <button 
-                    onClick={refreshCameras}
-                    className="p-1 rounded-full bg-green-500/10 text-green-400 hover:bg-green-500/20"
-                    title="Refresh Camera List"
-                  >
-                    <RotateCcw size={16} />
-                  </button>
-                </div>
-                <select 
-                  value={selectedCameraId}
-                  onChange={(e) => selectCamera(e.target.value)}
-                  className="block w-full px-3 py-2 bg-black/80 border border-green-500/20 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 text-green-400 backdrop-blur-sm"
-                >
-                  <option value="" className="bg-black/90">Auto ({facingMode === "environment" ? "Rear" : "Front"})</option>
-                  {availableCameras.map((camera) => (
-                    <option key={camera.deviceId} value={camera.deviceId} className="bg-black/90">
-                      {camera.label || `Camera ${camera.deviceId.substring(0, 5)}...`}
-                    </option>
-                  ))}
-                </select>
-                <div className="text-xs text-green-400/70 mt-1">
-                  Available Cameras: {availableCameras.length}
-                </div>
-              </div>
-            )}
-            
-            {/* Quality selection */}
-            <div>
-              <label className="block text-sm font-medium text-green-400 mb-1">Image Quality</label>
+      {/* Fixed bottom controls bar - comprehensive mobile controls */}
+      <div className={`fixed bottom-0 left-0 right-0 bg-black/90 backdrop-blur-md border-t border-white/20 z-40`}>
+        {/* Two-row layout for mobile to fit all controls */}
+        {isMobile ? (
+          <div className="space-y-2 p-3">
+            {/* Top row - Navigation and main controls */}
+            <div className="flex items-center justify-between">
+              {/* Back/Forward navigation buttons */}
               <div className="flex space-x-2">
-                <button
-                  onClick={() => changeQuality("standard")}
-                  className={`px-3 py-1 rounded ${quality === "standard" ? 'bg-green-500 text-white' : 'bg-green-500/10 text-green-400 hover:bg-green-500/20'}`}
+                <button 
+                  onClick={() => window.history.back()}
+                  className="p-2 rounded-full bg-white/20 text-white hover:bg-white/30 transition-all"
+                  title="Go Back"
                 >
-                  Standard
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="m15 18-6-6 6-6"/>
+                  </svg>
                 </button>
-                <button
-                  onClick={() => changeQuality("high")}
-                  className={`px-3 py-1 rounded ${quality === "high" ? 'bg-green-500 text-white' : 'bg-green-500/10 text-green-400 hover:bg-green-500/20'}`}
+                <button 
+                  onClick={() => window.history.forward()}
+                  className="p-2 rounded-full bg-white/20 text-white hover:bg-white/30 transition-all"
+                  title="Go Forward"
                 >
-                  High
-                </button>
-                <button
-                  onClick={() => changeQuality("ultra")}
-                  className={`px-3 py-1 rounded ${quality === "ultra" ? 'bg-green-500 text-white' : 'bg-green-500/10 text-green-400 hover:bg-green-500/20'}`}
-                >
-                  Ultra HD
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="m9 18 6-6-6-6"/>
+                  </svg>
                 </button>
               </div>
+
+              {/* Central camera control button */}
+              <button 
+                onClick={toggleCameraActive}
+                className={`px-6 py-3 rounded-full font-semibold text-sm transition-all ${
+                  isCameraActive 
+                    ? 'bg-red-500 text-white hover:bg-red-600' 
+                    : 'bg-green-500 text-white hover:bg-green-600'
+                }`}
+                title={isCameraActive ? "Stop Camera" : "Start Camera"}
+              >
+                {isCameraActive ? '⏹ STOP' : '▶ START'}
+              </button>
+
+              {/* Camera switch */}
+              <button 
+                onClick={toggleCamera}
+                className="p-2 rounded-full bg-white/20 text-white hover:bg-white/30 transition-all"
+                title="Switch Camera"
+              >
+                <RefreshCw size={18} />
+              </button>
+            </div>
+
+            {/* Bottom row - Zoom controls */}
+            <div className="flex items-center justify-center space-x-2">
+              <button 
+                onClick={handleResetZoom}
+                className="p-2 rounded-full bg-white/20 text-white hover:bg-white/30 transition-all"
+                title="Reset Zoom"
+              >
+                <Minimize size={16} />
+              </button>
+
+              <button 
+                onClick={handleZoomOut}
+                disabled={zoomLevel <= 1}
+                className={`p-2 rounded-full transition-all ${
+                  zoomLevel <= 1 
+                    ? 'bg-white/10 text-white/40' 
+                    : 'bg-white/20 text-white hover:bg-white/30'
+                }`}
+                title="Zoom Out"
+              >
+                <ZoomOut size={16} />
+              </button>
+              
+              <div className="min-w-14 text-center">
+                <span className="text-white font-medium text-sm">{Math.round(zoomLevel * 100)}%</span>
+              </div>
+              
+              <button 
+                onClick={handleZoomIn}
+                disabled={zoomLevel >= (opticalZoomSupported ? maxOpticalZoom : 4)}
+                className={`p-2 rounded-full transition-all ${
+                  zoomLevel >= (opticalZoomSupported ? maxOpticalZoom : 4)
+                    ? 'bg-white/10 text-white/40' 
+                    : 'bg-white/20 text-white hover:bg-white/30'
+                }`}
+                title="Zoom In"
+              >
+                <ZoomIn size={16} />
+              </button>
+              
+              <button 
+                onClick={handleMaxZoom}
+                className="p-2 rounded-full bg-white/20 text-white hover:bg-white/30 transition-all"
+                title="Maximum Zoom"
+              >
+                <Maximize size={16} />
+              </button>
+            </div>
+          </div>
+        ) : (
+          /* Desktop single-row layout */
+          <div className="flex items-center justify-center space-x-4 p-4">
+            {/* Back/Forward */}
+            <div className="flex space-x-2">
+              <button 
+                onClick={() => window.history.back()}
+                className="p-3 rounded-full bg-white/20 text-white hover:bg-white/30 transition-all"
+                title="Go Back"
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="m15 18-6-6 6-6"/>
+                </svg>
+              </button>
+              <button 
+                onClick={() => window.history.forward()}
+                className="p-3 rounded-full bg-white/20 text-white hover:bg-white/30 transition-all"
+                title="Go Forward"
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="m9 18 6-6-6-6"/>
+                </svg>
+              </button>
+            </div>
+
+            {/* Zoom controls */}
+            <button 
+              onClick={handleResetZoom}
+              className="p-3 rounded-full bg-white/20 text-white hover:bg-white/30 transition-all"
+              title="Reset Zoom"
+            >
+              <Minimize size={20} />
+            </button>
+
+            <button 
+              onClick={handleZoomOut}
+              disabled={zoomLevel <= 1}
+              className={`p-3 rounded-full transition-all ${
+                zoomLevel <= 1 
+                  ? 'bg-white/10 text-white/40' 
+                  : 'bg-white/20 text-white hover:bg-white/30'
+              }`}
+              title="Zoom Out"
+            >
+              <ZoomOut size={20} />
+            </button>
+            
+            <div className="min-w-20 text-center">
+              <span className="text-white font-medium text-lg">{Math.round(zoomLevel * 100)}%</span>
             </div>
             
-            {/* Enhancement level */}
+            <button 
+              onClick={handleZoomIn}
+              disabled={zoomLevel >= (opticalZoomSupported ? maxOpticalZoom : 4)}
+              className={`p-3 rounded-full transition-all ${
+                zoomLevel >= (opticalZoomSupported ? maxOpticalZoom : 4)
+                  ? 'bg-white/10 text-white/40' 
+                  : 'bg-white/20 text-white hover:bg-white/30'
+              }`}
+              title="Zoom In"
+            >
+              <ZoomIn size={20} />
+            </button>
+            
+            <button 
+              onClick={handleMaxZoom}
+              className="p-3 rounded-full bg-white/20 text-white hover:bg-white/30 transition-all"
+              title="Maximum Zoom"
+            >
+              <Maximize size={20} />
+            </button>
+
+            {/* Camera control button */}
+            <button 
+              onClick={toggleCameraActive}
+              className={`px-6 py-3 rounded-full font-semibold transition-all ${
+                isCameraActive 
+                  ? 'bg-red-500 text-white hover:bg-red-600' 
+                  : 'bg-green-500 text-white hover:bg-green-600'
+              }`}
+              title={isCameraActive ? "Stop Camera" : "Start Camera"}
+            >
+              {isCameraActive ? '⏹ STOP' : '▶ START'}
+            </button>
+
+            {/* Camera switch */}
+            <button 
+              onClick={toggleCamera}
+              className="p-3 rounded-full bg-white/20 text-white hover:bg-white/30 transition-all"
+              title="Switch Camera"
+            >
+              <RefreshCw size={20} />
+            </button>
+          </div>
+        )}
+      </div>
+      
+      {/* Mobile-optimized slide-out settings panel */}
+      <div 
+        className={`fixed top-0 right-0 h-full ${isMobile ? 'w-full' : 'w-80'} bg-black/95 backdrop-blur-xl border-l border-white/20 transform transition-transform duration-300 ease-out z-50 ${
+          showSettings ? 'translate-x-0' : 'translate-x-full'
+        }`}
+      >
+        {/* Settings header */}
+        <div className={`flex items-center justify-between ${isMobile ? 'p-3' : 'p-4'} border-b border-white/20`}>
+          <h3 className={`text-white ${isMobile ? 'text-base' : 'text-lg'} font-semibold`}>Camera Settings</h3>
+          <button 
+            onClick={toggleSettings}
+            className="p-2 rounded-full bg-white/20 text-white hover:bg-white/30 transition-all"
+          >
+            <X size={isMobile ? 18 : 20} />
+          </button>
+        </div>
+        
+        {/* Settings content - scrollable */}
+        <div className={`h-full overflow-y-auto pb-20 ${isMobile ? 'p-3' : 'p-4'} space-y-4`}>
+          
+          {/* Camera selection */}
+          {availableCameras.length > 0 && (
             <div>
-              <label className="block text-sm font-medium text-green-400 mb-1">
-                Image Enhancement: {enhancementLevel}
-              </label>
+              <div className="flex items-center justify-between mb-3">
+                <label className={`block text-white font-medium ${isMobile ? 'text-sm' : ''}`}>Camera</label>
+                <button 
+                  onClick={refreshCameras}
+                  className="p-2 rounded-full bg-white/20 text-white hover:bg-white/30 transition-all"
+                  title="Refresh Camera List"
+                >
+                  <RotateCcw size={16} />
+                </button>
+              </div>
+              <select 
+                value={selectedCameraId}
+                onChange={(e) => selectCamera(e.target.value)}
+                className={`block w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent backdrop-blur-sm ${isMobile ? 'text-sm' : ''}`}
+              >
+                <option value="" className="bg-black/90">Auto ({facingMode === "environment" ? "Rear" : "Front"})</option>
+                {availableCameras.map((camera) => (
+                  <option key={camera.deviceId} value={camera.deviceId} className="bg-black/90">
+                    {camera.label || `Camera ${camera.deviceId.substring(0, 5)}...`}
+                  </option>
+                ))}
+              </select>
+              <div className={`text-white/70 ${isMobile ? 'text-xs' : 'text-sm'} mt-2`}>
+                Available: {availableCameras.length} camera{availableCameras.length !== 1 ? 's' : ''}
+              </div>
+            </div>
+          )}
+          
+          {/* Quality selection */}
+          <div>
+            <label className={`block text-white font-medium mb-3 ${isMobile ? 'text-sm' : ''}`}>Image Quality</label>
+            <div className="grid grid-cols-3 gap-2">
+              <button
+                onClick={() => changeQuality("standard")}
+                className={`px-3 py-2 rounded-lg ${isMobile ? 'text-xs' : 'text-sm'} font-medium transition-all ${
+                  quality === "standard" 
+                    ? 'bg-blue-500 text-white' 
+                    : 'bg-white/10 text-white hover:bg-white/20'
+                }`}
+              >
+                Standard
+              </button>
+              <button
+                onClick={() => changeQuality("high")}
+                className={`px-3 py-2 rounded-lg ${isMobile ? 'text-xs' : 'text-sm'} font-medium transition-all ${
+                  quality === "high" 
+                    ? 'bg-blue-500 text-white' 
+                    : 'bg-white/10 text-white hover:bg-white/20'
+                }`}
+              >
+                High
+              </button>
+              <button
+                onClick={() => changeQuality("ultra")}
+                className={`px-3 py-2 rounded-lg ${isMobile ? 'text-xs' : 'text-sm'} font-medium transition-all ${
+                  quality === "ultra" 
+                    ? 'bg-blue-500 text-white' 
+                    : 'bg-white/10 text-white hover:bg-white/20'
+                }`}
+              >
+                Ultra HD
+              </button>
+            </div>
+          </div>
+          
+          {/* Enhancement level */}
+          <div>
+            <label className={`block text-white font-medium mb-3 ${isMobile ? 'text-sm' : ''}`}>
+              Image Enhancement: {enhancementLevel}
+            </label>
+            <div className="space-y-2">
               <input
                 type="range"
                 min="0"
                 max="5"
                 value={enhancementLevel}
                 onChange={(e) => setEnhancementLevel(parseInt(e.target.value))}
-                className="w-full accent-green-500"
+                className="w-full accent-blue-500"
               />
-              <div className="text-xs text-green-400/70 mt-1">
-                0: No enhancement - 5: Maximum enhancement
+              <div className={`flex justify-between text-white/70 ${isMobile ? 'text-xs' : 'text-xs'}`}>
+                <span>None</span>
+                <span>Maximum</span>
               </div>
             </div>
-            
-            {/* Sharpness level */}
-            <div>
-              <label className="block text-sm font-medium text-green-400 mb-1">
-                Image Sharpness: {sharpness}
-              </label>
+          </div>
+          
+          {/* Sharpness level */}
+          <div>
+            <label className={`block text-white font-medium mb-3 ${isMobile ? 'text-sm' : ''}`}>
+              Image Sharpness: {sharpness}
+            </label>
+            <div className="space-y-2">
               <input
                 type="range"
                 min="0"
                 max="4"
                 value={sharpness}
                 onChange={(e) => setSharpness(parseInt(e.target.value))}
-                className="w-full accent-green-500"
+                className="w-full accent-blue-500"
               />
-              <div className="text-xs text-green-400/70 mt-1">
-                0: No sharpening - 4: Maximum sharpness
+              <div className={`flex justify-between text-white/70 ${isMobile ? 'text-xs' : 'text-xs'}`}>
+                <span>None</span>
+                <span>Sharp</span>
               </div>
             </div>
-            
-            {/* Auto Focus section */}
-            <div>
-              <label className="block text-sm font-medium text-green-400 mb-1">
-                Auto Focus
-              </label>
-              <div className="flex items-center space-x-2">
-                <button
-                  onClick={() => setAutoFocus(true)}
-                  className={`px-3 py-1 rounded ${autoFocus ? 'bg-green-500 text-white' : 'bg-green-500/10 text-green-400 hover:bg-green-500/20'}`}
-                >
-                  On
-                </button>
-                <button
-                  onClick={() => setAutoFocus(false)}
-                  className={`px-3 py-1 rounded ${!autoFocus ? 'bg-green-500 text-white' : 'bg-green-500/10 text-green-400 hover:bg-green-500/20'}`}
-                >
-                  Off
-                </button>
-              </div>
+          </div>
+          
+          {/* Auto Focus section */}
+          <div>
+            <label className={`block text-white font-medium mb-3 ${isMobile ? 'text-sm' : ''}`}>Auto Focus</label>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                onClick={() => setAutoFocus(true)}
+                className={`px-3 py-2 rounded-lg ${isMobile ? 'text-xs' : 'text-sm'} font-medium transition-all ${
+                  autoFocus 
+                    ? 'bg-blue-500 text-white' 
+                    : 'bg-white/10 text-white hover:bg-white/20'
+                }`}
+              >
+                On
+              </button>
+              <button
+                onClick={() => setAutoFocus(false)}
+                className={`px-3 py-2 rounded-lg ${isMobile ? 'text-xs' : 'text-sm'} font-medium transition-all ${
+                  !autoFocus 
+                    ? 'bg-blue-500 text-white' 
+                    : 'bg-white/10 text-white hover:bg-white/20'
+                }`}
+              >
+                Off
+              </button>
             </div>
-            
-            {/* Camera capabilities info */}
-            <div className="text-sm text-green-400/70 mt-2 border-t border-green-500/20 pt-2">
-              <div>Optical Zoom: {opticalZoomSupported ? `Supported (up to ${maxOpticalZoom}x)` : "Not supported"}</div>
+          </div>
+          
+          {/* Camera capabilities info */}
+          <div className="bg-white/5 rounded-lg p-3 border border-white/10">
+            <h4 className={`text-white font-medium mb-2 ${isMobile ? 'text-sm' : ''}`}>Camera Capabilities</h4>
+            <div className={`text-white/70 ${isMobile ? 'text-xs' : 'text-sm'} space-y-1`}>
+              <div>Optical Zoom: {opticalZoomSupported ? `✅ Up to ${maxOpticalZoom}x` : "❌ Not supported"}</div>
+              <div>Digital Zoom: ✅ Up to 4x</div>
+              <div>Auto Focus: {autoFocus ? "✅ Enabled" : "❌ Disabled"}</div>
             </div>
           </div>
         </div>
+      </div>
+      
+      {/* Background overlay when settings open */}
+      {showSettings && (
+        <div 
+          className="fixed inset-0 bg-black/50 z-40"
+          onClick={toggleSettings}
+        />
       )}
     </div>
   );

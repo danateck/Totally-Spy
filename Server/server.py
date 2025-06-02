@@ -1618,7 +1618,48 @@ async def quick_osint_enhancement(scan_id: int, user: User = Depends(get_current
 
 
 
-
+@app.get("/users/search")
+async def search_users(q: str = "", user: User = Depends(get_current_user)):
+    """Search for users by username for autocomplete functionality"""
+    try:
+        conn = get_db_connection()
+        if not conn:
+            raise HTTPException(status_code=500, detail="Database connection failed")
+        
+        try:
+            with conn.cursor() as cur:
+                if q.strip():
+                    # Search for users whose username contains the query string
+                    cur.execute("""
+                        SELECT username FROM users 
+                        WHERE username ILIKE %s 
+                        AND username != %s
+                        ORDER BY username
+                        LIMIT 20
+                    """, (f"%{q}%", user.username))
+                else:
+                    # Return all users except current user (limited to 20)
+                    cur.execute("""
+                        SELECT username FROM users 
+                        WHERE username != %s
+                        ORDER BY username
+                        LIMIT 20
+                    """, (user.username,))
+                
+                results = cur.fetchall()
+                usernames = [row[0] for row in results]
+                
+                return {
+                    "users": [{"username": username} for username in usernames],
+                    "count": len(usernames)
+                }
+                
+        finally:
+            conn.close()
+            
+    except Exception as e:
+        logging.error(f"Error searching users: {e}")
+        raise HTTPException(status_code=500, detail="Failed to search users")
 
 
 @app.get("/{full_path:path}")
