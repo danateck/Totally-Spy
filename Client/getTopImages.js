@@ -89,3 +89,24 @@ function getTopImages(imageElements, topN = 3) {
     scored.sort((a, b) => b.score - a.score);
     return scored.slice(0, topN).map(s => s.img);
 }
+
+async function sendBestFrameToServer(imageElement, scanId) {
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d");
+    canvas.width = imageElement.width;
+    canvas.height = imageElement.height;
+    ctx.drawImage(imageElement, 0, 0, canvas.width, canvas.height);
+
+    const base64Image = canvas.toDataURL("image/jpeg");
+
+    await fetch("/api/scan/save_best_frame", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+            scanId,
+            image: base64Image
+        })
+    });
+}

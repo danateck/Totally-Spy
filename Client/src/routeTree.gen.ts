@@ -15,6 +15,7 @@ import { Route as IndexImport } from './routes/index'
 import { Route as SignupIndexImport } from './routes/signup/index'
 import { Route as RecordIndexImport } from './routes/record/index'
 import { Route as ProfileIndexImport } from './routes/profile/index'
+import { Route as MyRequestsIndexImport } from './routes/my-requests/index'
 import { Route as LoginIndexImport } from './routes/login/index'
 import { Route as HistoryIndexImport } from './routes/history/index'
 import { Route as DashboardIndexImport } from './routes/dashboard/index'
@@ -44,6 +45,12 @@ const RecordIndexRoute = RecordIndexImport.update({
 const ProfileIndexRoute = ProfileIndexImport.update({
   id: '/profile/',
   path: '/profile/',
+  getParentRoute: () => rootRoute,
+} as any)
+
+const MyRequestsIndexRoute = MyRequestsIndexImport.update({
+  id: '/my-requests/',
+  path: '/my-requests/',
   getParentRoute: () => rootRoute,
 } as any)
 
@@ -123,6 +130,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LoginIndexImport
       parentRoute: typeof rootRoute
     }
+    '/my-requests/': {
+      id: '/my-requests/'
+      path: '/my-requests'
+      fullPath: '/my-requests'
+      preLoaderRoute: typeof MyRequestsIndexImport
+      parentRoute: typeof rootRoute
+    }
     '/profile/': {
       id: '/profile/'
       path: '/profile'
@@ -156,6 +170,7 @@ export interface FileRoutesByFullPath {
   '/dashboard': typeof DashboardIndexRoute
   '/history': typeof HistoryIndexRoute
   '/login': typeof LoginIndexRoute
+  '/my-requests': typeof MyRequestsIndexRoute
   '/profile': typeof ProfileIndexRoute
   '/record': typeof RecordIndexRoute
   '/signup': typeof SignupIndexRoute
@@ -168,6 +183,7 @@ export interface FileRoutesByTo {
   '/dashboard': typeof DashboardIndexRoute
   '/history': typeof HistoryIndexRoute
   '/login': typeof LoginIndexRoute
+  '/my-requests': typeof MyRequestsIndexRoute
   '/profile': typeof ProfileIndexRoute
   '/record': typeof RecordIndexRoute
   '/signup': typeof SignupIndexRoute
@@ -181,6 +197,7 @@ export interface FileRoutesById {
   '/dashboard/': typeof DashboardIndexRoute
   '/history/': typeof HistoryIndexRoute
   '/login/': typeof LoginIndexRoute
+  '/my-requests/': typeof MyRequestsIndexRoute
   '/profile/': typeof ProfileIndexRoute
   '/record/': typeof RecordIndexRoute
   '/signup/': typeof SignupIndexRoute
@@ -195,6 +212,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/history'
     | '/login'
+    | '/my-requests'
     | '/profile'
     | '/record'
     | '/signup'
@@ -206,6 +224,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/history'
     | '/login'
+    | '/my-requests'
     | '/profile'
     | '/record'
     | '/signup'
@@ -217,6 +236,7 @@ export interface FileRouteTypes {
     | '/dashboard/'
     | '/history/'
     | '/login/'
+    | '/my-requests/'
     | '/profile/'
     | '/record/'
     | '/signup/'
@@ -230,6 +250,7 @@ export interface RootRouteChildren {
   DashboardIndexRoute: typeof DashboardIndexRoute
   HistoryIndexRoute: typeof HistoryIndexRoute
   LoginIndexRoute: typeof LoginIndexRoute
+  MyRequestsIndexRoute: typeof MyRequestsIndexRoute
   ProfileIndexRoute: typeof ProfileIndexRoute
   RecordIndexRoute: typeof RecordIndexRoute
   SignupIndexRoute: typeof SignupIndexRoute
@@ -242,6 +263,7 @@ const rootRouteChildren: RootRouteChildren = {
   DashboardIndexRoute: DashboardIndexRoute,
   HistoryIndexRoute: HistoryIndexRoute,
   LoginIndexRoute: LoginIndexRoute,
+  MyRequestsIndexRoute: MyRequestsIndexRoute,
   ProfileIndexRoute: ProfileIndexRoute,
   RecordIndexRoute: RecordIndexRoute,
   SignupIndexRoute: SignupIndexRoute,
@@ -263,6 +285,7 @@ export const routeTree = rootRoute
         "/dashboard/",
         "/history/",
         "/login/",
+        "/my-requests/",
         "/profile/",
         "/record/",
         "/signup/"
@@ -285,6 +308,9 @@ export const routeTree = rootRoute
     },
     "/login/": {
       "filePath": "login/index.tsx"
+    },
+    "/my-requests/": {
+      "filePath": "my-requests/index.tsx"
     },
     "/profile/": {
       "filePath": "profile/index.tsx"
