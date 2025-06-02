@@ -1,4 +1,3 @@
-
 import base64
 import uuid
 from io import BytesIO
@@ -231,6 +230,59 @@ async def get_records(user: User = Depends(get_current_user)):
     records = get_scan_history(user.username)
     return {"records": records}
 
+@app.get("/history/recordings/paginated")
+async def get_records_paginated(
+    page: int = 1,
+    limit: int = 20,
+    search: str = "",
+    sort: str = "newest",
+    date_filter: str = "all",
+    favorites_only: bool = False,
+    user: User = Depends(get_current_user)
+):
+    """
+    Get paginated scan history with server-side filtering, sorting, and date filtering.
+    
+    Parameters:
+    - page: Page number (1-based)
+    - limit: Records per page (max 100)
+    - search: Search term for filtering by name
+    - sort: Sort order ('newest', 'oldest', 'name')
+    - date_filter: Date filter ('all', 'today', 'week', 'month')
+    - favorites_only: Show only favorite records
+    """
+    # Validate parameters
+    if page < 1:
+        page = 1
+    if limit < 1 or limit > 100:  # Cap at 100 records per page
+        limit = 20
+    
+    # Validate sort parameter
+    if sort not in ['newest', 'oldest', 'name']:
+        sort = 'newest'
+    
+    # Validate date_filter parameter
+    if date_filter not in ['all', 'today', 'week', 'month']:
+        date_filter = 'all'
+    
+    try:
+        result = get_scan_history_paginated(user.username, page=page, limit=limit, search=search, sort=sort, date_filter=date_filter, favorites_only=favorites_only)
+        return {
+            "success": True,
+            "data": result["records"],
+            "pagination": {
+                "current_page": result["page"],
+                "per_page": result["limit"],
+                "total_records": result["total_count"],
+                "total_pages": result["total_pages"],
+                "has_next": result["page"] < result["total_pages"],
+                "has_prev": result["page"] > 1
+            }
+        }
+    except Exception as e:
+        logger.error(f"Error fetching paginated records for user {user.username}: {e}")
+        raise HTTPException(status_code=500, detail="Failed to fetch records")
+
 @app.get("/history/record/{record_id}")
 async def get_record(record_id: int, user: User = Depends(get_current_user)):
     record = get_scan_history_by_id(user.id, record_id)
@@ -299,7 +351,12 @@ async def create_portfolio_route(portfolio_data: PortfolioRequest, user: User = 
 @app.get("/portfolio/list")
 async def list_user_portfolios(user: User = Depends(get_current_user)):
     portfolios = get_portfolios_for_user(user.id)
-    return {"portfolios": portfolios}
+    # Convert tuple format to dict format for easier frontend consumption
+    portfolio_list = [
+        {"id": p[0], "name": p[1], "role": p[2]} 
+        for p in portfolios
+    ]
+    return {"portfolios": portfolio_list}
 
 # Share a portfolio with another user by adding them as a member
 @app.post("/portfolio/share")
@@ -873,13 +930,13 @@ async def run_comprehensive_osint_enhancement(scan_id: int):
     
     try:
         # Step 1: Update progress to processing
-        osint_progress[scan_id] = {
+        osint_progress[scan_id].update({
             'status': 'processing',
             'progress': 10,
             'message': 'Starting OSINT enhancement...',
             'current_step': 'initialization',
             'started_at': time.time()
-        }
+        })
         print(f"✅ Progress initialized")
         
         # Step 2: Get scan data
@@ -1689,6 +1746,26 @@ async def save_best_frame(data: BestFrameData, user: User = Depends(get_current_
     except Exception as e:
         logger.error(f"Error saving best frame: {e}")
         raise HTTPException(status_code=500, detail="Failed to save best frame")
+
+@app.post("/history/toggle_favorite")
+async def toggle_record_favorite(request: Request, user: User = Depends(get_current_user)):
+    """Toggle the favorite status of a scan record."""
+    try:
+        data = await request.json()
+        scan_id = data.get("scanId")
+        
+        if not scan_id:
+            raise HTTPException(status_code=400, detail="Missing scanId")
+        
+        new_favorite_status = toggle_scan_favorite(scan_id, user.id)
+        return {
+            "success": True,
+            "is_favorite": new_favorite_status,
+            "message": "Added to favorites" if new_favorite_status else "Removed from favorites"
+        }
+    except Exception as e:
+        logger.error(f"Error toggling favorite for user {user.username}: {e}")
+        raise HTTPException(status_code=500, detail="Failed to toggle favorite")
 
 
 

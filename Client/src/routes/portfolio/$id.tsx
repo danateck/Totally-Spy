@@ -58,8 +58,6 @@ function PortfolioComponent() {
   const [showAddMemberModal, setShowAddMemberModal] = useState(false)
   const [newMemberUsername, setNewMemberUsername] = useState('')
   const [newMemberRole, setNewMemberRole] = useState('editor')
-  const [showAddScanModal, setShowAddScanModal] = useState(false)
-  const [availableScans, setAvailableScans] = useState<Scan[]>([])
   const [showRenameModal, setShowRenameModal] = useState(false)
   const [newPortfolioName, setNewPortfolioName] = useState('')
   const [showDeleteModal, setShowDeleteModal] = useState(false)
@@ -82,7 +80,6 @@ function PortfolioComponent() {
     setShowErrorDialog(true)
     // Close any open modals
     setShowAddMemberModal(false)
-    setShowAddScanModal(false)
   }
 
   // Fetch users for autocomplete based on search term
@@ -287,23 +284,7 @@ function PortfolioComponent() {
       })
       console.log('Transformed scans for ScanDetails:', transformedScans)
 
-      // Compare with regular recordings - let's also fetch from the regular endpoint to compare
-      try {
-        const regularResponse = await fetch('/portfolio/overview', {
-          credentials: 'include'
-        })
-        if (regularResponse.ok) {
-          const regularData = await regularResponse.json()
-          console.log('Regular recordings data structure:', regularData)
-          console.log('Comparing scan 744 data:')
-          console.log('- Portfolio scan 744:', transformedScans.find((s: Scan) => s.id === 744))
-          console.log('- Regular recordings scan 744:', regularData.recordings?.find((r: any) => r.id === 744))
-        }
-      } catch (e) {
-        console.log('Could not fetch regular recordings for comparison')
-      }
-
-      // Rest of your existing code...
+      // Fetch portfolio members
       const membersResponse = await fetch(`/portfolio/${id}/members`, {
         credentials: 'include',
         headers: {
@@ -332,19 +313,6 @@ function PortfolioComponent() {
       handleError(err instanceof Error ? err.message : 'An unexpected error occurred')
     } finally {
       setLoading(false)
-    }
-  }
-
-  const fetchAvailableScans = async () => {
-    try {
-      const response = await fetch('/portfolio/overview', {
-        credentials: 'include'
-      })
-      if (!response.ok) throw new Error('Failed to fetch available scans')
-      const data = await response.json()
-      setAvailableScans(data.unassigned_recordings || [])
-    } catch (err) {
-      handleError(err instanceof Error ? err.message : 'Failed to fetch available scans')
     }
   }
 
@@ -396,31 +364,6 @@ function PortfolioComponent() {
       fetchPortfolioData()
     } catch (err) {
       handleError(err instanceof Error ? err.message : 'Failed to add member')
-    }
-  }
-
-  const handleAddScan = async (scanId: number) => {
-    try {
-      const response = await fetch('/portfolio/add_scan', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify({
-          portfolioId: parseInt(id),
-          scanId: scanId
-        })
-      })
-
-      if (!response.ok) {
-        throw new Error('Failed to add scan')
-      }
-
-      setShowAddScanModal(false)
-      fetchPortfolioData()
-    } catch (err) {
-      handleError(err instanceof Error ? err.message : 'Failed to add scan')
     }
   }
 
@@ -896,35 +839,6 @@ function PortfolioComponent() {
                   className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Add
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Add Scan Modal */}
-        {showAddScanModal && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center">
-            <div className="bg-card p-6 rounded-xl shadow-lg w-full max-w-md">
-              <h2 className="text-xl font-bold mb-4">Add Record</h2>
-              <div className="space-y-2 max-h-96 overflow-y-auto">
-                {availableScans.map((scan) => (
-                  <button
-                    key={scan.id}
-                    onClick={() => handleAddScan(scan.id)}
-                    className="w-full p-4 bg-background rounded-lg hover:bg-accent transition-colors text-left"
-                  >
-                    <h3 className="text-lg font-medium">{scan.name}</h3>
-                    <p className="text-sm text-muted-foreground">{scan.date}</p>
-                  </button>
-                ))}
-              </div>
-              <div className="flex justify-end mt-4">
-                <button
-                  onClick={() => setShowAddScanModal(false)}
-                  className="px-4 py-2 bg-muted text-muted-foreground rounded-lg hover:bg-muted/80"
-                >
-                  Close
                 </button>
               </div>
             </div>
