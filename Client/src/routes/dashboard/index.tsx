@@ -1,13 +1,7 @@
 import { Logo } from '@/components/logo/logo'
 import { createFileRoute, useRouter, Link } from '@tanstack/react-router'
 import { useAuth } from '@/hooks/useAuth'
-import {
-  AlertDialog,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
+import VideoUpload from '@/components/video-upload/VideoUpload'
 import { useState } from 'react'
 
 export const Route = createFileRoute('/dashboard/')({
@@ -17,11 +11,10 @@ export const Route = createFileRoute('/dashboard/')({
 function DashboardComponent() {
   const { logout } = useAuth()
   const router = useRouter()
-  const [showDialog, setShowDialog] = useState(false)
+  const [showVideoUpload, setShowVideoUpload] = useState(false)
 
   const handleUploadVideo = () => {
-    setShowDialog(true)
-    setTimeout(() => setShowDialog(false), 1000)
+    setShowVideoUpload(true)
   }
 
   const handleSignOut = async () => {
@@ -29,11 +22,14 @@ function DashboardComponent() {
     router.navigate({ to: '/login' })
   }
 
+  const handleCloseVideoUpload = () => {
+    setShowVideoUpload(false)
+  }
+
   return (
     <div
       className="min-h-screen bg-background text-foreground relative"
       style={{ backgroundColor: "black" }}
-
     >
       {/* Sign Out Button in top-left corner */}
       <div className="absolute top-4 left-4">
@@ -65,17 +61,10 @@ function DashboardComponent() {
       <div className="max-w-4xl mx-auto py-12 px-4 sm:px-6 lg:px-8">
         <Logo className="mb-12" />
 
-        {/* Alert Dialog */}
-        <AlertDialog open={showDialog} onOpenChange={setShowDialog}>
-          <AlertDialogContent className="bg-card border border-border">
-            <AlertDialogHeader>
-              <AlertDialogTitle className="text-primary">Coming Soon!</AlertDialogTitle>
-              <AlertDialogDescription className="text-muted-foreground">
-                Video upload feature will be available in a future update.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-          </AlertDialogContent>
-        </AlertDialog>
+        {/* Video Upload Modal */}
+        {showVideoUpload && (
+          <VideoUpload onClose={handleCloseVideoUpload} />
+        )}
 
         {/* Main Actions */}
         <div className="grid gap-6 md:grid-cols-3 mb-12">

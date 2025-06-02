@@ -163,8 +163,11 @@ async def search_info(image_data: ImageData, user: User = Depends(get_current_us
             str_data = convert_to_formatted_string(detected_data) 
 
             if detected_data:
-                insert_scan(user.username, str_data)
-                return {"message": detected_data}
+                scan_id = insert_scan(user.username, str_data)
+                if scan_id:
+                    return {"message": detected_data, "scan_id": scan_id}
+                else:
+                    raise HTTPException(status_code=500, detail="Failed to save scan")
             else:
                 raise HTTPException(status_code=202, detail="No data found.")
         except HTTPException as he:
