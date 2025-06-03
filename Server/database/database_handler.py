@@ -538,7 +538,7 @@ def insert_user(username: str, password: str) -> int | None:
         finally:
             conn.close()
 
-def insert_scan(username: str, detected_text: str) -> Optional[int]:
+def insert_scan(username: str, detected_text: str, best_frame_base64: str = None) -> Optional[int]:
     conn = get_db_connection()
     if conn:
         try: 
@@ -559,10 +559,16 @@ def insert_scan(username: str, detected_text: str) -> Optional[int]:
                 current_time = datetime.now()
                 default_name = f"{current_time.strftime('%d %b %Y %H:%M')} Recording"
                 
-                cur.execute(
-                    "INSERT INTO scan_history (user_id, detected_text, name) VALUES (%s, %s, %s) RETURNING id;",
-                    (user_id, encrypted_text, default_name)
-                )
+                if best_frame_base64 is not None:
+                    cur.execute(
+                        "INSERT INTO scan_history (user_id, detected_text, name, best_frame_base64) VALUES (%s, %s, %s, %s) RETURNING id;",
+                        (user_id, encrypted_text, default_name, best_frame_base64)
+                    )
+                else:
+                    cur.execute(
+                        "INSERT INTO scan_history (user_id, detected_text, name) VALUES (%s, %s, %s) RETURNING id;",
+                        (user_id, encrypted_text, default_name)
+                    )
                 scan_id = cur.fetchone()[0]
                 conn.commit()
                 logger.info(f"Scan history added successfully with ID: {scan_id}")

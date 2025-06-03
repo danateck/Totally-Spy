@@ -111,6 +111,10 @@ function RouteComponent() {
   const [showModal, setShowModal] = useState(false)
   const [showOSINT, setShowOSINT] = useState(false)
   const [showProfileDropdown, setShowProfileDropdown] = useState(false)
+  const [picShow, setPicShow] = useState(false)
+  const [base64Image, setBase64Image] = useState<string | null>(null);
+  const [showPicError, setShowPicError] = useState<string | null>(null);
+  const [picLoading, setPicLoading] = useState(false);
   const params = Route.useParams()
   
   const handleSignOut = async () => {
@@ -203,6 +207,41 @@ function RouteComponent() {
   const handleModalClose = () => {
     setShowModal(false);
   };
+
+  const handleShowPicture = async () => {
+    setShowPicError(null);
+    setPicLoading(true);
+    try {
+      const response = await fetch(`/api/scan/${params.item}/image`, {
+        credentials: 'include',
+      });
+  
+      if (!response.ok) {
+        if (response.status === 404) {
+          setShowPicError('No screenshot found for this record.');
+        } else {
+          setShowPicError('Failed to load screenshot. Please try again.');
+        }
+        setPicShow(false);
+        return;
+      }
+  
+      const data = await response.json();
+      if (!data.image_base64) {
+        setShowPicError('No screenshot found for this record.');
+        setPicShow(false);
+        return;
+      }
+      setBase64Image(data.image_base64);
+      setPicShow(true);
+    } catch (error) {
+      setShowPicError('Failed to load screenshot. Please try again.');
+      setPicShow(false);
+    } finally {
+      setPicLoading(false);
+    }
+  };
+  
   
   // Handle delete confirmation
   const handleConfirmDelete = async () => {
@@ -499,8 +538,20 @@ function RouteComponent() {
           <div className="space-y-4">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
               <h2 className="text-xl sm:text-2xl font-semibold text-primary">Recording Details</h2>
-              <div className="px-3 py-1 rounded-full text-sm font-medium bg-green-500/20 text-green-400 w-fit">
-                Processing Successful
+              <div className="flex items-center gap-2">
+                <div className="px-3 py-1 rounded-full text-sm font-medium bg-green-500/20 text-green-400 w-fit">
+                  Processing Successful
+                </div>
+                <Button
+                  onClick={handleDeleteClick}
+                  disabled={isDeleting}
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90 flex items-center gap-2 px-3 py-2"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M1 7h22M8 7V5a2 2 0 012-2h4a2 2 0 012 2v2" />
+                  </svg>
+                  {isDeleting ? 'Deleting...' : 'Delete'}
+                </Button>
               </div>
             </div>
 
@@ -541,14 +592,29 @@ function RouteComponent() {
                   Click to start OSINT intelligence gathering
                 </div>
               </div>
-              
-              <Button
-                onClick={handleDeleteClick}
-                disabled={isDeleting}
-                className="w-full bg-destructive text-destructive-foreground hover:bg-destructive/90"
+
+              <Button 
+                disabled={picShow || picLoading}
+                onClick={handleShowPicture}
+                className={`w-full bg-blue-600 text-white rounded-lg transition-all duration-150
+                  ${picLoading ? 'opacity-60 cursor-not-allowed' : 'hover:bg-blue-700 active:scale-95'}
+                  ${picShow ? 'opacity-60 cursor-not-allowed' : ''}`}
               >
-                {isDeleting ? 'Deleting...' : 'Delete Record'}
+                {picLoading ? (
+                  <span className="flex items-center justify-center">
+                    <svg className="animate-spin h-4 w-4 mr-2 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path>
+                    </svg>
+                    Loading...
+                  </span>
+                ) : (
+                  'Show screenshot'
+                )}
               </Button>
+              {showPicError && (
+                <div className="mt-2 text-red-500 text-sm text-center animate-pulse">{showPicError}</div>
+              )}
             </div>
           </div>
         </div>
@@ -577,6 +643,31 @@ function RouteComponent() {
         onConfirm={handleConfirmDelete}
         isDeleting={isDeleting}
       />
+
+      {/* Floating modal for screenshot */}
+      {picShow && base64Image && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+          <div className="relative bg-card rounded-lg shadow-2xl p-4 max-w-full max-h-full flex flex-col items-center">
+            <div className="absolute top-2 right-2 flex gap-2">
+              <button
+                onClick={() => setPicShow(false)}
+                className="text-gray-400 hover:text-red-500 text-xl font-bold focus:outline-none px-2"
+                aria-label="Close"
+              >
+                ×
+              </button>
+            </div>
+            <p className="mb-2 font-medium text-sm text-muted-foreground mt-8">Best Frame</p>
+            <div className="overflow-auto max-h-[80vh] max-w-[80vw] flex items-center justify-center">
+              <img 
+                src={base64Image} 
+                alt="Best Frame" 
+                className="max-w-full max-h-[70vh] h-auto rounded-md border"
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
