@@ -1690,7 +1690,7 @@ async def save_best_frame(data: BestFrameData, user: User = Depends(get_current_
         logger.error(f"Error saving best frame: {e}")
         raise HTTPException(status_code=500, detail="Failed to save best frame")
 
-
+#for showing screenshot to client
 @app.get("/api/scan/{scan_id}/image")
 async def get_best_frame(scan_id: int, user: User = Depends(get_current_user)):
     conn = get_db_connection()
@@ -1713,6 +1713,7 @@ async def get_best_frame(scan_id: int, user: User = Depends(get_current_user)):
                 raise HTTPException(status_code=404, detail="No image found")
 
             return {"image_base64": image_base64}
+        
     finally:
         conn.close()
 
