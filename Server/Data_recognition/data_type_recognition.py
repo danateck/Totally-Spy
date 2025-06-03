@@ -15,12 +15,16 @@ patterns = {
 
     # New address detection
     "ADDRESS_HEBREW": re.compile(
-        r"(?:רחוב|שדרות|דרך|כיכר)\s+[א-ת\"'\-\s]+\s+\d{1,4}(?:[,]\s*[א-ת\"'\-\s]+)?"
+        r"(?:רחוב|שדרות|דרך|כיכר)\s+[א-ת\"'\-]{2,}(?:\s+[א-ת\"'\-]{2,}){0,2}\s+\d{1,4}(?=[\s,]|$)"
     ),
+
     "ADDRESS_ENGLISH": re.compile(
-        r"\b\d{1,5}\s+(?:[A-Z][a-z]*\s){1,3}(?:St|Street|Ave|Avenue|Rd|Road|Blvd|Boulevard|Lane|Ln|Dr|Drive|Ct|Court)\b(?:,\s*\w+)*"
+    r"(?:\b(?:Apartment|Apt|Unit|Suite)\s*\d+[A-Za-z]?\s*,\s*)?"       
+    r"\b\d+[A-Za-z]?\s+(?:[A-Z][a-z]+(?:\s|$)){1,3}"                     
+    r"(?:St|Street|Ave|Avenue|Rd|Road|Blvd|Boulevard|Lane|Ln|Dr|Drive|Ct|Court)\b"
     ),
 }
+
 
 def classify_text(text: str) -> list[tuple[str, str]]:
     detected = []
@@ -48,10 +52,16 @@ def classify_text(text: str) -> list[tuple[str, str]]:
             detected_spans.append(span)
 
     # --- AI-style heuristic: Detect ambiguous sensitive numbers ---
+    # Get all numbers that were already detected by priority patterns
+    already_detected_numbers = {item[0] for item in detected}
+    
+    # Find all potential sensitive numbers
     fallback_matches = re.findall(r"\b\d{5,12}\b", text)
+    
+    # Filter out numbers that were already detected
+    fallback_matches = [val for val in fallback_matches if val not in already_detected_numbers]
+    
     for val in fallback_matches:
-        if any(val in item[0] for item in detected):
-            continue
         context_blob = TextBlob(text)
         if context_blob.words.count(val) == 0:
             continue  

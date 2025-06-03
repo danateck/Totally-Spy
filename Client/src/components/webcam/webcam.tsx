@@ -236,7 +236,7 @@ const WebcamCapture: React.FC<{
   
   // Handle zooming in with limits
   const handleZoomIn = () => {
-    const newZoom = Math.min(zoomLevel + 0.25, opticalZoomSupported ? maxOpticalZoom : 4);
+    const newZoom = Math.min(zoomLevel + 0.125, opticalZoomSupported ? maxOpticalZoom : 4);
     setZoomLevel(newZoom);
     
     if (opticalZoomSupported) {
@@ -467,15 +467,13 @@ const WebcamCapture: React.FC<{
       >
         {/* Top overlay indicators */}
         <div className={`absolute ${isMobile ? 'top-2 left-2 right-2' : 'top-4 left-4 right-4'} flex justify-between items-start z-30 pointer-events-none`}>
-          {/* Zoom indicator */}
-          <div className={`bg-black/70 text-white ${isMobile ? 'px-2 py-1 text-xs' : 'px-3 py-1 text-sm'} rounded-full font-medium backdrop-blur-sm`}>
-            {Math.round(zoomLevel * 100)}% {opticalZoomSupported ? '(Optical)' : ''}
-          </div>
-          
           {/* Quality indicator */}
           <div className={`bg-black/70 text-white ${isMobile ? 'px-2 py-1 text-xs' : 'px-3 py-1 text-sm'} rounded-full font-medium backdrop-blur-sm`}>
             {quality === "ultra" ? "ULTRA HD" : quality === "high" ? "HD" : "Standard"}
           </div>
+          
+          {/* Empty space for balance */}
+          <div></div>
         </div>
         
         {/* Camera controls - top right - compact on mobile */}
@@ -563,30 +561,8 @@ const WebcamCapture: React.FC<{
         {/* Two-row layout for mobile to fit all controls */}
         {isMobile ? (
           <div className="space-y-2 p-3">
-            {/* Top row - Navigation and main controls */}
-            <div className="flex items-center justify-between">
-              {/* Back/Forward navigation buttons */}
-              <div className="flex space-x-2">
-                <button 
-                  onClick={() => window.history.back()}
-                  className="p-2 rounded-full bg-white/20 text-white hover:bg-white/30 transition-all"
-                  title="Go Back"
-                >
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="m15 18-6-6 6-6"/>
-                  </svg>
-                </button>
-                <button 
-                  onClick={() => window.history.forward()}
-                  className="p-2 rounded-full bg-white/20 text-white hover:bg-white/30 transition-all"
-                  title="Go Forward"
-                >
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="m9 18 6-6-6-6"/>
-                  </svg>
-                </button>
-              </div>
-
+            {/* Top row - Main controls */}
+            <div className="flex items-center justify-center">
               {/* Central camera control button */}
               <button 
                 onClick={toggleCameraActive}
@@ -598,15 +574,6 @@ const WebcamCapture: React.FC<{
                 title={isCameraActive ? "Stop Camera" : "Start Camera"}
               >
                 {isCameraActive ? '⏹ STOP' : '▶ START'}
-              </button>
-
-              {/* Camera switch */}
-              <button 
-                onClick={toggleCamera}
-                className="p-2 rounded-full bg-white/20 text-white hover:bg-white/30 transition-all"
-                title="Switch Camera"
-              >
-                <RefreshCw size={18} />
               </button>
             </div>
 
@@ -662,28 +629,6 @@ const WebcamCapture: React.FC<{
         ) : (
           /* Desktop single-row layout */
           <div className="flex items-center justify-center space-x-4 p-4">
-            {/* Back/Forward */}
-            <div className="flex space-x-2">
-              <button 
-                onClick={() => window.history.back()}
-                className="p-3 rounded-full bg-white/20 text-white hover:bg-white/30 transition-all"
-                title="Go Back"
-              >
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="m15 18-6-6 6-6"/>
-                </svg>
-              </button>
-              <button 
-                onClick={() => window.history.forward()}
-                className="p-3 rounded-full bg-white/20 text-white hover:bg-white/30 transition-all"
-                title="Go Forward"
-              >
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="m9 18 6-6-6-6"/>
-                </svg>
-              </button>
-            </div>
-
             {/* Zoom controls */}
             <button 
               onClick={handleResetZoom}
@@ -742,15 +687,6 @@ const WebcamCapture: React.FC<{
               title={isCameraActive ? "Stop Camera" : "Start Camera"}
             >
               {isCameraActive ? '⏹ STOP' : '▶ START'}
-            </button>
-
-            {/* Camera switch */}
-            <button 
-              onClick={toggleCamera}
-              className="p-3 rounded-full bg-white/20 text-white hover:bg-white/30 transition-all"
-              title="Switch Camera"
-            >
-              <RefreshCw size={20} />
             </button>
           </div>
         )}
