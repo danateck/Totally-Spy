@@ -1691,6 +1691,30 @@ async def save_best_frame(data: BestFrameData, user: User = Depends(get_current_
         raise HTTPException(status_code=500, detail="Failed to save best frame")
 
 
+@app.get("/api/scan/{scan_id}/image")
+async def get_best_frame(scan_id: int, user: User = Depends(get_current_user)):
+    conn = get_db_connection()
+    if not conn:
+        raise HTTPException(status_code=500, detail="Database connection failed")
+
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT user_id, best_frame_base64 FROM scan_history WHERE id = %s", (scan_id,))
+            row = cur.fetchone()
+
+            if not row:
+                raise HTTPException(status_code=404, detail="Scan not found")
+
+            owner_id, image_base64 = row
+            if owner_id != user.id:
+                raise HTTPException(status_code=403, detail="Permission denied")
+
+            if not image_base64:
+                raise HTTPException(status_code=404, detail="No image found")
+
+            return {"image_base64": image_base64}
+    finally:
+        conn.close()
 
 
 

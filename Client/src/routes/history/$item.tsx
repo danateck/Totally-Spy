@@ -108,6 +108,8 @@ function RouteComponent() {
   const [isDeleting, setIsDeleting] = useState(false)
   const [showModal, setShowModal] = useState(false)
   const [showOSINT, setShowOSINT] = useState(false)
+  const [picShow, setPicShow] = useState(false)
+  const [base64Image, setBase64Image] = useState<string | null>(null);
   const params = Route.useParams()
   
   // Handle OSINT enhancement
@@ -180,6 +182,25 @@ function RouteComponent() {
   const handleModalClose = () => {
     setShowModal(false);
   };
+
+  const handleShowPicture = async () => {
+    try {
+      const response = await fetch(`/api/scan/${params.item}/image`, {
+        credentials: 'include',
+      });
+  
+      if (!response.ok) {
+        throw new Error('Failed to load image');
+      }
+  
+      const data = await response.json();
+      setBase64Image(data.image_base64);
+      setPicShow(true);
+    } catch (error) {
+      console.error('Error fetching image:', error);
+    }
+  };
+  
   
   // Handle delete confirmation
   const handleConfirmDelete = async () => {
@@ -322,6 +343,25 @@ function RouteComponent() {
               >
                 {isDeleting ? 'Deleting...' : 'Delete Record'}
               </Button>
+
+              <Button 
+                disabled={picShow}
+                onClick={handleShowPicture}
+                className="w-full bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                Show screenshot
+              </Button>
+
+              {picShow && base64Image && (
+              <div className="mt-4 p-4 border border-border rounded-lg bg-muted text-center">
+                <p className="mb-2 font-medium text-sm text-muted-foreground">Best Frame</p>
+                <img 
+                  src={`data:image/jpeg;base64,${base64Image}`} 
+                  alt="Best Frame" 
+                  className="max-w-full h-auto rounded-md border"
+                />
+              </div>
+            )}
+
             </div>
           </div>
         </div>
