@@ -52,10 +52,16 @@ def classify_text(text: str) -> list[tuple[str, str]]:
             detected_spans.append(span)
 
     # --- AI-style heuristic: Detect ambiguous sensitive numbers ---
+    # Get all numbers that were already detected by priority patterns
+    already_detected_numbers = {item[0] for item in detected}
+    
+    # Find all potential sensitive numbers
     fallback_matches = re.findall(r"\b\d{5,12}\b", text)
+    
+    # Filter out numbers that were already detected
+    fallback_matches = [val for val in fallback_matches if val not in already_detected_numbers]
+    
     for val in fallback_matches:
-        if any(val in item[0] for item in detected):
-            continue
         context_blob = TextBlob(text)
         if context_blob.words.count(val) == 0:
             continue  
