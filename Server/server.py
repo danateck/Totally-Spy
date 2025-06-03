@@ -3,27 +3,33 @@ import uuid
 from io import BytesIO
 import os
 from pathlib import Path
+import time
+import random
+import logging
+from typing import Literal, Optional
 
 import numpy as np
 from PIL import Image
-from fastapi import Depends, FastAPI, Cookie, Response, Request, HTTPException, status
+import cv2
+from fastapi import Depends, FastAPI, Cookie, Response, Request, HTTPException, status, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse, FileResponse, JSONResponse
 from pydantic import BaseModel
-import cv2
-from typing import Literal
 
 from Data_recognition.data_type_recognition import classify_text
 from Enhance_Image.pictureChange import enhance_image
 from OCR.OCRManager import OCRManager
 from database.database_handler import *
 from YOLO8.detect_phone import DetectPhone, get_phones_from_cords, find_largest_phone_from_cords
+from OSINT_API.osint_enhancer import OSINTEnhancer
 
 app = FastAPI()
 ocr_manager = OCRManager()
 detector = DetectPhone('./YOLO8/best.pt')
 client_path = "../Client/dist/"
+osint_enhancer = OSINTEnhancer()
+osint_progress = {}
 
 # Configure CORS
 app.add_middleware(
@@ -43,7 +49,7 @@ create_users_table()
 create_scan_history_table()
 create_session_table()
 create_portfolio_tables()
-ensure_scan_history_columns()  # Ensure scan_history has all required columns
+ensure_scan_history_columns()
 
 class UserLogin(BaseModel):
     username: str
@@ -98,6 +104,10 @@ class RespondRequestBody(BaseModel):
     requestId: int
     action: Literal["approve", "reject"]
 
+class BestFrameData(BaseModel):
+    scanId: int
+    image: str  # base64 string
+
 def convert_to_formatted_string(detected_texts: list[tuple[str, str]]) -> str:
     # Join each tuple into a single line with label and value separated by ':'
     formatted_string = '\n'.join(f"{label}:{value}" for label, value in detected_texts)
@@ -129,6 +139,21 @@ def decode_base64_frame(base64_frame):
     frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
     return frame
 
+def draw_ocr_boxes_on_image(image, word_data, detected_values, offset_x=0, offset_y=0):
+    box_count = 0
+    
+    for word_info in word_data:
+        word = word_info.get("word", "")
+        cords = word_info.get("cords", [])
+        
+        if word in detected_values and len(cords) == 4:
+            pts = [(x + offset_x, y + offset_y) for (x, y) in cords]
+            pts_np = np.array(pts, np.int32).reshape((-1, 1, 2))
+            cv2.polylines(image, [pts_np], isClosed=True, color=(0, 255, 0), thickness=3)
+            box_count += 1
+        
+    return image
+
 @app.post("/record/img")
 async def search_info(image_data: ImageData, user: User = Depends(get_current_user)):
     try:
@@ -152,20 +177,37 @@ async def search_info(image_data: ImageData, user: User = Depends(get_current_us
         # Process the frame to extract text and detect relevant data (e.g., OTP)
         try:
             cord_cropped_image = detector.find_cord_for_phones(frame)
-            cropped_image = get_phones_from_cords(frame, find_largest_phone_from_cords(cord_cropped_image))
+            phone_boxes = find_largest_phone_from_cords(cord_cropped_image)
+            cropped_image = get_phones_from_cords(frame, phone_boxes)
             if len(cropped_image) > 0:
                 cropped_image = cropped_image[0]
+                # Get the crop rectangle for offset
+                x1, y1, x2, y2, _ = phone_boxes[0]
             else:
                 raise HTTPException(status_code=201, detail="No phone found.")
             enhanced_image = enhance_image(cropped_image)
-            extracted_text = ocr_manager.extract_text(enhanced_image)
-            detected_data = classify_text(extracted_text[0])
-            str_data = convert_to_formatted_string(detected_data) 
+            # Use OCR to get both text and bounding boxes
+            extracted_text, word_data = ocr_manager.extract_text(enhanced_image)
+            detected_data = classify_text(extracted_text)
+            str_data = convert_to_formatted_string(detected_data)
+
+            # Only draw for detected values
+            detected_values = set(val for val, _ in detected_data)
+
+            # Draw boxes on the enhanced image (where OCR was actually performed)
+            annotated_image = enhanced_image.copy()
+            draw_ocr_boxes_on_image(annotated_image, word_data, detected_values, offset_x=0, offset_y=0)
+
+            # Encode the annotated enhanced image as base64 with higher quality and compression
+            encode_params = [int(cv2.IMWRITE_JPEG_QUALITY), 90, int(cv2.IMWRITE_JPEG_OPTIMIZE), 1]
+            _, buffer = cv2.imencode('.jpg', annotated_image, encode_params)
+            best_frame_base64 = base64.b64encode(buffer).decode('utf-8')
+            best_frame_base64 = f"data:image/jpeg;base64,{best_frame_base64}"
 
             if detected_data:
-                scan_id = insert_scan(user.username, str_data)
+                scan_id = insert_scan(user.username, str_data, best_frame_base64=best_frame_base64)
                 if scan_id:
-                    return {"message": detected_data, "scan_id": scan_id}
+                    return {"message": detected_data, "scan_id": scan_id, "debug_word_data": word_data}
                 else:
                     raise HTTPException(status_code=500, detail="Failed to save scan")
             else:
@@ -207,7 +249,6 @@ async def login(login_data: UserLogin, response: Response):
         logging.error(f"Error during login: {e}")
         raise HTTPException(status_code=500, detail="Error during login.")
 
-
 @app.post("/auth/signup")
 async def create_user(create_user_data: UserLogin, response: Response):
     try:
@@ -227,6 +268,38 @@ async def create_user(create_user_data: UserLogin, response: Response):
     except Exception as e:
         logging.error(f"Error during user creation: {e}")
         raise HTTPException(status_code=500, detail="Error during user creation.")
+
+@app.get("/api/user/profile")
+async def get_user_profile(user: User = Depends(get_current_user)):
+    try:
+        # Use user.id instead of username
+        scan_count = get_scan_count_for_user(user.id)
+        
+        # Create user data object
+        user_data = {
+            "username": user.username,
+            # You might not have these fields, customize as needed
+            "joinDate": user.created_at if hasattr(user, 'created_at') else None,
+            "totalRecordings": scan_count,
+            "lastActive": "Today"  # Or implement a way to track last activity
+        }
+        
+        return {"user": user_data}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch user profile: {str(e)}")
+
+@app.post("/api/user/delete")
+async def delete_current_user(user: User = Depends(get_current_user)):
+    try:
+        # Remove user session first (optional cleanup)
+        delete_sessions_for_user(user.id)
+        
+        # Remove user from database
+        delete_user(user.username)
+        
+        return {"message": "User deleted successfully"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="Failed to delete user")
 
 @app.get("/history/recordings")
 async def get_records(user: User = Depends(get_current_user)):
@@ -290,38 +363,6 @@ async def get_records_paginated(
 async def get_record(record_id: int, user: User = Depends(get_current_user)):
     record = get_scan_history_by_id(user.id, record_id)
     return {"record": record}
-
-@app.post("/api/user/delete")
-async def delete_current_user(user: User = Depends(get_current_user)):
-    try:
-        # Remove user session first (optional cleanup)
-        delete_sessions_for_user(user.id)
-        
-        # Remove user from database
-        delete_user(user.username)
-        
-        return {"message": "User deleted successfully"}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail="Failed to delete user")
-    
-@app.get("/api/user/profile")
-async def get_user_profile(user: User = Depends(get_current_user)):
-    try:
-        # Use user.id instead of username
-        scan_count = get_scan_count_for_user(user.id)
-        
-        # Create user data object
-        user_data = {
-            "username": user.username,
-            # You might not have these fields, customize as needed
-            "joinDate": user.created_at if hasattr(user, 'created_at') else None,
-            "totalRecordings": scan_count,
-            "lastActive": "Today"  # Or implement a way to track last activity
-        }
-        
-        return {"user": user_data}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to fetch user profile: {str(e)}")
 
 @app.post("/history/delete")
 async def delete_history_record(request: Request, user: User = Depends(get_current_user)):
@@ -506,7 +547,6 @@ async def portfolio_overview(user: User = Depends(get_current_user)):
     except Exception as e:
         raise HTTPException(status_code=500, detail="Failed to retrieve portfolio overview")
     
-
 @app.get("/portfolio/{portfolio_id}/name", response_model=PortfolioNameResponse)
 async def get_portfolio_name(portfolio_id: int, user: User = Depends(get_current_user)):
     logger.info(f"Fetching name for portfolio {portfolio_id} for user {user.id}")
@@ -574,7 +614,6 @@ async def get_portfolio(portfolio_id: int, user: User = Depends(get_current_user
     except Exception as e:
         logger.error(f"Error getting portfolio: {e}")
         raise HTTPException(status_code=500, detail=str(e))
-
 
 @app.post("/portfolio/rename")
 async def rename_portfolio_route(data: RenamePortfolioRequest, user: User = Depends(get_current_user)):
@@ -682,7 +721,6 @@ async def get_pending_requests(user: User = Depends(get_current_user)):
         logger.error(f"Failed to fetch pending requests: {e}")
         raise HTTPException(status_code=500, detail="Internal server error")
 
-
 @app.post("/portfolio/request/respond")
 async def respond_to_request(data: RespondRequestBody, user: User = Depends(get_current_user)):
     try:
@@ -694,60 +732,9 @@ async def respond_to_request(data: RespondRequestBody, user: User = Depends(get_
         logger.error(f"Error responding to request: {e}")
         raise HTTPException(status_code=500, detail="Internal server error")
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# OSINT ----------------------------------------------------------
-
-import logging
-
-# Add these imports at the top of your file if not already present
-from fastapi import BackgroundTasks
-
-# Your existing OSINT enhancer initialization
-from OSINT_API.osint_enhancer import OSINTEnhancer
-import asyncio
-import threading
-
-# Initialize OSINT enhancer (add this near your other initializations)
-osint_enhancer = OSINTEnhancer()
-
-
-
-osint_progress = {}
-
-
-
-import time
-import random
-
-
-
-
-
-
-
-
-
-
-
-
+# =========================
+# OSINT ENDPOINTS
+# =========================
 @app.get('/api/scan-details/{scan_id}')
 async def get_scan_details(scan_id: int, user: User = Depends(get_current_user)):
     """Get detailed information for a specific scan"""
@@ -1354,7 +1341,6 @@ async def get_osint_statistics(user: User = Depends(get_current_user)):
         logging.error(f"Error getting OSINT statistics: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to get statistics: {str(e)}")
 
-# Add this simple test endpoint to verify the system works
 @app.post('/api/test-osint/{scan_id}')
 async def test_osint_system(scan_id: int, user: User = Depends(get_current_user)):
     """Test the OSINT system with a simple enhancement"""
@@ -1414,10 +1400,6 @@ async def test_osint_system(scan_id: int, user: User = Depends(get_current_user)
     except Exception as e:
         logging.error(f"Error testing OSINT system: {e}")
         return {"success": False, "message": f"Test failed: {str(e)}"}
-
-
-
-
 
 @app.post('/api/force-refresh-osint/{scan_id}')
 async def force_refresh_osint(scan_id: int, user: User = Depends(get_current_user)):
@@ -1479,24 +1461,6 @@ async def force_refresh_osint(scan_id: int, user: User = Depends(get_current_use
     except Exception as e:
         logging.error(f"Error force refreshing OSINT for scan {scan_id}: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to refresh OSINT data: {str(e)}")
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 @app.post('/api/quick-osint/{scan_id}')
 async def quick_osint_enhancement(scan_id: int, user: User = Depends(get_current_user)):
@@ -1672,12 +1636,6 @@ async def quick_osint_enhancement(scan_id: int, user: User = Depends(get_current
         logging.error(f"Error in quick OSINT for scan {scan_id}: {e}")
         raise HTTPException(status_code=500, detail=f"Quick OSINT failed: {str(e)}")
 
-
-
-
-
-
-
 @app.get("/users/search")
 async def search_users(q: str = "", user: User = Depends(get_current_user)):
     """Search for users by username for autocomplete functionality"""
@@ -1720,35 +1678,6 @@ async def search_users(q: str = "", user: User = Depends(get_current_user)):
     except Exception as e:
         logging.error(f"Error searching users: {e}")
         raise HTTPException(status_code=500, detail="Failed to search users")
-
-
-@app.get("/{full_path:path}")
-async def serve_spa(full_path: str):
-    # Check if it's an API endpoint
-    if full_path.startswith(('api/', 'history/', 'auth/')):
-        # If it's an API endpoint that doesn't exist, return 404
-        raise HTTPException(status_code=404, detail="API endpoint not found")
-    
-    # For all other routes, serve the index.html
-    index_path = os.path.join(client_path, "index.html")
-    if os.path.exists(index_path):
-        return FileResponse(index_path)
-    else:
-        raise HTTPException(status_code=404, detail="index.html not found")
-    
-    
-class BestFrameData(BaseModel):
-    scanId: int
-    image: str  # base64 string
-
-@app.post("/api/scan/save_best_frame")
-async def save_best_frame(data: BestFrameData, user: User = Depends(get_current_user)):
-    try:
-        save_best_frame_to_db(data.scanId, user.id, data.image)
-        return {"message": "Best frame saved successfully"}
-    except Exception as e:
-        logger.error(f"Error saving best frame: {e}")
-        raise HTTPException(status_code=500, detail="Failed to save best frame")
 
 @app.post("/history/toggle_favorite")
 async def toggle_record_favorite(request: Request, user: User = Depends(get_current_user)):
@@ -1797,6 +1726,16 @@ async def get_best_frame(scan_id: int, user: User = Depends(get_current_user)):
     finally:
         conn.close()
 
-
-
-
+@app.get("/{full_path:path}")
+async def serve_spa(full_path: str):
+    # Check if it's an API endpoint
+    if full_path.startswith(('api/', 'history/', 'auth/')):
+        # If it's an API endpoint that doesn't exist, return 404
+        raise HTTPException(status_code=404, detail="API endpoint not found")
+    
+    # For all other routes, serve the index.html
+    index_path = os.path.join(client_path, "index.html")
+    if os.path.exists(index_path):
+        return FileResponse(index_path)
+    else:
+        raise HTTPException(status_code=404, detail="index.html not found")
