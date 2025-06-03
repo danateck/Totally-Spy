@@ -236,7 +236,7 @@ const WebcamCapture: React.FC<{
   
   // Handle zooming in with limits
   const handleZoomIn = () => {
-    const newZoom = Math.min(zoomLevel + 0.25, opticalZoomSupported ? maxOpticalZoom : 4);
+    const newZoom = Math.min(zoomLevel + 0.125, opticalZoomSupported ? maxOpticalZoom : 4);
     setZoomLevel(newZoom);
     
     if (opticalZoomSupported) {
