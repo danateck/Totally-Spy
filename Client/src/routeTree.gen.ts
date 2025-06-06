@@ -22,12 +22,19 @@ import { Route as GpsIndexImport } from './routes/gps/index'
 import { Route as DashboardIndexImport } from './routes/dashboard/index'
 import { Route as PortfolioIdImport } from './routes/portfolio/$id'
 import { Route as HistoryItemImport } from './routes/history/$item'
+import { Route as GpsPortfolioPage } from './routes/gps/$gps-portfolio'
 
 // Create/Update Routes
 
 const IndexRoute = IndexImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRoute,
+} as any)
+
+const GpsPortfolioPage = GpsPortfolioPage.update({
+  id: '/gps/$gps-portfolio',
+  path: '/gps/$gps-portfolio',
   getParentRoute: () => rootRoute,
 } as any)
 
@@ -107,6 +114,13 @@ declare module '@tanstack/react-router' {
       path: '/history/$item'
       fullPath: '/history/$item'
       preLoaderRoute: typeof HistoryItemImport
+      parentRoute: typeof rootRoute
+    }
+    '/gps/$gps-portfolio': {
+      id: '/gps/$gps-portfolio'
+      path: '/gps/$gps-portfolio'
+      fullPath: '/gps/$gps-portfolio'
+      preLoaderRoute: typeof GpsPortfolioPage
       parentRoute: typeof rootRoute
     }
     '/portfolio/$id': {
@@ -189,6 +203,7 @@ export interface FileRoutesByFullPath {
   '/profile': typeof ProfileIndexRoute
   '/record': typeof RecordIndexRoute
   '/signup': typeof SignupIndexRoute
+  '/gps/$gps-portfolio': typeof GpsPortfolioPage
 }
 
 export interface FileRoutesByTo {
@@ -203,6 +218,7 @@ export interface FileRoutesByTo {
   '/profile': typeof ProfileIndexRoute
   '/record': typeof RecordIndexRoute
   '/signup': typeof SignupIndexRoute
+  '/gps/$gps-portfolio': typeof GpsPortfolioPage
 }
 
 export interface FileRoutesById {
@@ -218,6 +234,7 @@ export interface FileRoutesById {
   '/profile/': typeof ProfileIndexRoute
   '/record/': typeof RecordIndexRoute
   '/signup/': typeof SignupIndexRoute
+  '/gps/$gps-portfolio': typeof GpsPortfolioPage
 }
 
 export interface FileRouteTypes {
@@ -234,6 +251,7 @@ export interface FileRouteTypes {
     | '/profile'
     | '/record'
     | '/signup'
+    | '/gps/$gps-portfolio'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -247,6 +265,7 @@ export interface FileRouteTypes {
     | '/profile'
     | '/record'
     | '/signup'
+    | '/gps/$gps-portfolio'
   id:
     | '__root__'
     | '/'
@@ -260,6 +279,7 @@ export interface FileRouteTypes {
     | '/profile/'
     | '/record/'
     | '/signup/'
+    | '/gps/$gps-portfolio'
   fileRoutesById: FileRoutesById
 }
 
@@ -275,6 +295,7 @@ export interface RootRouteChildren {
   ProfileIndexRoute: typeof ProfileIndexRoute
   RecordIndexRoute: typeof RecordIndexRoute
   SignupIndexRoute: typeof SignupIndexRoute
+  GpsPortfolioPage: typeof GpsPortfolioPage
 }
 
 const rootRouteChildren: RootRouteChildren = {
@@ -289,6 +310,7 @@ const rootRouteChildren: RootRouteChildren = {
   ProfileIndexRoute: ProfileIndexRoute,
   RecordIndexRoute: RecordIndexRoute,
   SignupIndexRoute: SignupIndexRoute,
+  GpsPortfolioPage: GpsPortfolioPage,
 }
 
 export const routeTree = rootRoute
