@@ -18,6 +18,7 @@ import { Route as ProfileIndexImport } from './routes/profile/index'
 import { Route as MyRequestsIndexImport } from './routes/my-requests/index'
 import { Route as LoginIndexImport } from './routes/login/index'
 import { Route as HistoryIndexImport } from './routes/history/index'
+import { Route as GpsIndexImport } from './routes/gps/index'
 import { Route as DashboardIndexImport } from './routes/dashboard/index'
 import { Route as PortfolioIdImport } from './routes/portfolio/$id'
 import { Route as HistoryItemImport } from './routes/history/$item'
@@ -63,6 +64,12 @@ const LoginIndexRoute = LoginIndexImport.update({
 const HistoryIndexRoute = HistoryIndexImport.update({
   id: '/history/',
   path: '/history/',
+  getParentRoute: () => rootRoute,
+} as any)
+
+const GpsIndexRoute = GpsIndexImport.update({
+  id: '/gps/',
+  path: '/gps/',
   getParentRoute: () => rootRoute,
 } as any)
 
@@ -114,6 +121,13 @@ declare module '@tanstack/react-router' {
       path: '/dashboard'
       fullPath: '/dashboard'
       preLoaderRoute: typeof DashboardIndexImport
+      parentRoute: typeof rootRoute
+    }
+    '/gps/': {
+      id: '/gps/'
+      path: '/gps'
+      fullPath: '/gps'
+      preLoaderRoute: typeof GpsIndexImport
       parentRoute: typeof rootRoute
     }
     '/history/': {
@@ -168,6 +182,7 @@ export interface FileRoutesByFullPath {
   '/history/$item': typeof HistoryItemRoute
   '/portfolio/$id': typeof PortfolioIdRoute
   '/dashboard': typeof DashboardIndexRoute
+  '/gps': typeof GpsIndexRoute
   '/history': typeof HistoryIndexRoute
   '/login': typeof LoginIndexRoute
   '/my-requests': typeof MyRequestsIndexRoute
@@ -181,6 +196,7 @@ export interface FileRoutesByTo {
   '/history/$item': typeof HistoryItemRoute
   '/portfolio/$id': typeof PortfolioIdRoute
   '/dashboard': typeof DashboardIndexRoute
+  '/gps': typeof GpsIndexRoute
   '/history': typeof HistoryIndexRoute
   '/login': typeof LoginIndexRoute
   '/my-requests': typeof MyRequestsIndexRoute
@@ -195,6 +211,7 @@ export interface FileRoutesById {
   '/history/$item': typeof HistoryItemRoute
   '/portfolio/$id': typeof PortfolioIdRoute
   '/dashboard/': typeof DashboardIndexRoute
+  '/gps/': typeof GpsIndexRoute
   '/history/': typeof HistoryIndexRoute
   '/login/': typeof LoginIndexRoute
   '/my-requests/': typeof MyRequestsIndexRoute
@@ -210,6 +227,7 @@ export interface FileRouteTypes {
     | '/history/$item'
     | '/portfolio/$id'
     | '/dashboard'
+    | '/gps'
     | '/history'
     | '/login'
     | '/my-requests'
@@ -222,6 +240,7 @@ export interface FileRouteTypes {
     | '/history/$item'
     | '/portfolio/$id'
     | '/dashboard'
+    | '/gps'
     | '/history'
     | '/login'
     | '/my-requests'
@@ -234,6 +253,7 @@ export interface FileRouteTypes {
     | '/history/$item'
     | '/portfolio/$id'
     | '/dashboard/'
+    | '/gps/'
     | '/history/'
     | '/login/'
     | '/my-requests/'
@@ -248,6 +268,7 @@ export interface RootRouteChildren {
   HistoryItemRoute: typeof HistoryItemRoute
   PortfolioIdRoute: typeof PortfolioIdRoute
   DashboardIndexRoute: typeof DashboardIndexRoute
+  GpsIndexRoute: typeof GpsIndexRoute
   HistoryIndexRoute: typeof HistoryIndexRoute
   LoginIndexRoute: typeof LoginIndexRoute
   MyRequestsIndexRoute: typeof MyRequestsIndexRoute
@@ -261,6 +282,7 @@ const rootRouteChildren: RootRouteChildren = {
   HistoryItemRoute: HistoryItemRoute,
   PortfolioIdRoute: PortfolioIdRoute,
   DashboardIndexRoute: DashboardIndexRoute,
+  GpsIndexRoute: GpsIndexRoute,
   HistoryIndexRoute: HistoryIndexRoute,
   LoginIndexRoute: LoginIndexRoute,
   MyRequestsIndexRoute: MyRequestsIndexRoute,
@@ -283,6 +305,7 @@ export const routeTree = rootRoute
         "/history/$item",
         "/portfolio/$id",
         "/dashboard/",
+        "/gps/",
         "/history/",
         "/login/",
         "/my-requests/",
@@ -302,6 +325,9 @@ export const routeTree = rootRoute
     },
     "/dashboard/": {
       "filePath": "dashboard/index.tsx"
+    },
+    "/gps/": {
+      "filePath": "gps/index.tsx"
     },
     "/history/": {
       "filePath": "history/index.tsx"
