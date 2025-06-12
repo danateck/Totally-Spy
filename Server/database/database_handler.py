@@ -538,37 +538,40 @@ def insert_user(username: str, password: str) -> int | None:
         finally:
             conn.close()
 
-def insert_scan(username: str, detected_text: str, best_frame_base64: str = None) -> Optional[int]:
+def insert_scan(
+    username: str,
+    detected_text: str,
+    best_frame_base64: str = None,
+    latitude: Optional[float] = None,
+    longitude: Optional[float] = None
+) -> Optional[int]:
     conn = get_db_connection()
     if conn:
         try: 
-            # Get the user_id based on the username
             with conn.cursor() as cur:
                 user_id = get_user_id(username)
-
                 if user_id is None:
                     logger.warning(f"No user found with username: {username}")
-                    return None  # Return None if user is not found
+                    return None
                 
                 encrypted_text = encrypt_data(user_id, detected_text)
                 if encrypted_text is None:
                     logger.warning("Encryption failed!")
                     return None
                 
-                # Create a default name with formatted date (e.g., "21 Apr 2025 07:46 Recording")
                 current_time = datetime.now()
                 default_name = f"{current_time.strftime('%d %b %Y %H:%M')} Recording"
+
                 
-                if best_frame_base64 is not None:
-                    cur.execute(
-                        "INSERT INTO scan_history (user_id, detected_text, name, best_frame_base64) VALUES (%s, %s, %s, %s) RETURNING id;",
-                        (user_id, encrypted_text, default_name, best_frame_base64)
-                    )
-                else:
-                    cur.execute(
-                        "INSERT INTO scan_history (user_id, detected_text, name) VALUES (%s, %s, %s) RETURNING id;",
-                        (user_id, encrypted_text, default_name)
-                    )
+                query = """
+                    INSERT INTO scan_history 
+                    (user_id, detected_text, name, best_frame_base64, latitude, longitude) 
+                    VALUES (%s, %s, %s, %s, %s, %s)
+                    RETURNING id;
+                """
+                values = (user_id, encrypted_text, default_name, best_frame_base64, latitude, longitude)
+
+                cur.execute(query, values)
                 scan_id = cur.fetchone()[0]
                 conn.commit()
                 logger.info(f"Scan history added successfully with ID: {scan_id}")
@@ -579,7 +582,6 @@ def insert_scan(username: str, detected_text: str, best_frame_base64: str = None
         finally:
             conn.close()
     return None
-
 
 
 def encrypt_data(user_id: int, plaintext: str) -> Optional[str]:
@@ -915,10 +917,34 @@ def ensure_scan_history_columns():
                     cur.execute("ALTER TABLE scan_history ADD COLUMN is_favorite BOOLEAN DEFAULT FALSE;")
                     conn.commit()
                     logger.info("Added is_favorite column to scan_history table")
+
+                # Check if latitude column exists
+                cur.execute("""
+                    SELECT column_name 
+                    FROM information_schema.columns 
+                    WHERE table_name = 'scan_history' AND column_name = 'latitude';
+                """)
+                if not cur.fetchone():
+                    cur.execute("ALTER TABLE scan_history ADD COLUMN latitude DOUBLE PRECISION;")
+                    conn.commit()
+                    logger.info("Added latitude column to scan_history table")
+
+                # Check if longitude column exists
+                cur.execute("""
+                    SELECT column_name 
+                    FROM information_schema.columns 
+                    WHERE table_name = 'scan_history' AND column_name = 'longitude';
+                """)
+                if not cur.fetchone():
+                    cur.execute("ALTER TABLE scan_history ADD COLUMN longitude DOUBLE PRECISION;")
+                    conn.commit()
+                    logger.info("Added longitude column to scan_history table")
+
         except Exception as e:
             logger.error(f"Error ensuring scan_history columns: {e}")
         finally:
             conn.close()
+
 
 def update_existing_scan_names():
     """Update existing scan names to use the new format."""
