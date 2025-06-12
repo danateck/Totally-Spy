@@ -23,6 +23,8 @@ from OCR.OCRManager import OCRManager
 from database.database_handler import *
 from YOLO8.detect_phone import DetectPhone, get_phones_from_cords, find_largest_phone_from_cords
 from OSINT_API.osint_enhancer import OSINTEnhancer
+from typing import Optional
+from pydantic import BaseModel
 
 app = FastAPI()
 ocr_manager = OCRManager()
@@ -51,6 +53,8 @@ create_session_table()
 create_portfolio_tables()
 ensure_scan_history_columns()
 
+
+
 class UserLogin(BaseModel):
     username: str
     password: str
@@ -58,8 +62,13 @@ class UserLogin(BaseModel):
 class UserDetails(BaseModel):
     username: str
 
+class LocationData(BaseModel):
+    lat: float
+    lng: float
+
 class ImageData(BaseModel):
     image: str
+    location: Optional[LocationData] = None
 
 class PortfolioRequest(BaseModel):
     name: str
@@ -203,9 +212,13 @@ async def search_info(image_data: ImageData, user: User = Depends(get_current_us
             _, buffer = cv2.imencode('.jpg', annotated_image, encode_params)
             best_frame_base64 = base64.b64encode(buffer).decode('utf-8')
             best_frame_base64 = f"data:image/jpeg;base64,{best_frame_base64}"
+            
+            latitude = image_data.location.lat if image_data.location else None
+            longitude = image_data.location.lng if image_data.location else None
 
             if detected_data:
-                scan_id = insert_scan(user.username, str_data, best_frame_base64=best_frame_base64)
+                scan_id = insert_scan(user.username, str_data, best_frame_base64=best_frame_base64, latitude=latitude,
+                    longitude=longitude)
                 if scan_id:
                     return {"message": detected_data, "scan_id": scan_id, "debug_word_data": word_data}
                 else:

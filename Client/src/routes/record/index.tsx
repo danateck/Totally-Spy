@@ -7,6 +7,7 @@ import type { ApiResponseFoundCode } from '@/lib/api'
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { useAuth } from '@/hooks/useAuth'
 
+
 export const Route = createFileRoute('/record/')({
   component: RouteComponent,
 })
@@ -55,36 +56,56 @@ function RouteComponent() {
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [showProfileDropdown])
 
-  const handleCapture = async (imageSrc: string) => {
-    try {
-      const response = await fetch('/record/img', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify({ image: imageSrc.split(',')[1] })
-      });
-      
-      if (!response.ok) {
-        console.error('Failed to send image to server');
-        return;
-      }
-      
-      const data: ApiResponseFoundCode = await response.json();
-      
-      // Check if data and data.message exist before accessing them
-      if (data && data.message && Array.isArray(data.message) && data.message.length > 0) {
-        if (!data.message[0].includes('No')) {
-          setAlertTitle(data.message[0] || 'Success');
-          setAlertMessage(data.message[1] || 'Code found!');
-          setShowAlert(true);
+ const handleCapture = async (imageSrc: string) => {
+  try {
+    
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        const latitude = position.coords.latitude;
+        const longitude = position.coords.longitude;
+
+        const response = await fetch('/record/img', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          credentials: 'include',
+          body: JSON.stringify({
+            image: imageSrc.split(',')[1], // Base64 without prefix
+            location: {
+              lat: latitude,
+              lng: longitude,
+            },
+          }),
+        });
+
+        if (!response.ok) {
+          console.error('Failed to send image to server');
+          return;
         }
+
+        const data: ApiResponseFoundCode = await response.json();
+
+        if (data && data.message && Array.isArray(data.message) && data.message.length > 0) {
+          if (!data.message[0].includes('No')) {
+            setAlertTitle(data.message[0] || 'Success');
+            setAlertMessage(data.message[1] || 'Code found!');
+            setShowAlert(true);
+          }
+        }
+      },
+      (error) => {
+        console.error('GPS Error:', error);
+        setAlertTitle('Location Error');
+        setAlertMessage('We could not track your GPS location');
+        setShowAlert(true);
       }
-    } catch (error) {
-      console.error('Error sending image:', error);
-    }
+    );
+
+  } catch (error) {
+    console.error('Error sending image:', error);
   }
+};
 
   return (
     <div className="h-screen bg-background text-foreground overflow-hidden flex flex-col"
