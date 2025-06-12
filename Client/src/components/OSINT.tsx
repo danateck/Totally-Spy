@@ -274,49 +274,55 @@ const EnhancedOSINTDisplay: React.FC<EnhancedOSINTDisplayProps> = ({ scanId, onC
     return new Date(dateString).toLocaleString();
   };
 
-  const ProgressBar: React.FC<{ progress: OSINTProgress }> = ({ progress }) => (
-    <div className="w-full bg-gray-200 rounded-full h-4 mb-4">
-      <div 
-        className="bg-blue-600 h-4 rounded-full transition-all duration-300 ease-out relative overflow-hidden"
-        style={{ width: `${progress.progress}%` }}
-      >
-        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white to-transparent opacity-20 animate-pulse"></div>
-      </div>
-      <div className="flex justify-between text-sm mt-2">
-        <span className="text-gray-600">{progress.message}</span>
-        <span className="font-medium">{progress.progress}%</span>
-      </div>
+const ProgressBar: React.FC<{ progress: OSINTProgress }> = ({ progress }) => (
+  <div className="w-full bg-muted rounded-full h-4 mb-4">
+    <div
+      className="bg-green-500 h-4 rounded-full transition-all duration-300 ease-out relative overflow-hidden"
+      style={{ width: `${progress.progress}%` }}
+    >
+      <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white to-transparent opacity-10 animate-pulse"></div>
     </div>
-  );
+    <div className="flex justify-between text-sm mt-2">
+      <span className="text-muted-foreground">{progress.message}</span>
+      <span className="font-medium text-foreground">{progress.progress}%</span>
+    </div>
+  </div>
+);
 
   const ProgressDetails: React.FC<{ progress: OSINTProgress }> = ({ progress }) => (
-    <div className="mt-4 p-4 bg-blue-50 rounded-lg">
-      <div className="grid grid-cols-2 gap-4 text-sm">
-        <div>
-          <span className="font-medium">Current Step:</span>
-          <span className="ml-2 capitalize">{progress.current_step?.replace('_', ' ') || 'Unknown'}</span>
-        </div>
-        {progress.total_queries && (
-          <div>
-            <span className="font-medium">Queries:</span>
-            <span className="ml-2">{progress.queries_completed || 0}/{progress.total_queries}</span>
-          </div>
-        )}
-        {progress.detected_data_summary && (
-          <div className="col-span-2">
-            <span className="font-medium">Detected Data:</span>
-            <span className="ml-2">{progress.detected_data_summary.join(', ')}</span>
-          </div>
-        )}
-        {progress.current_query && (
-          <div className="col-span-2">
-            <span className="font-medium">Current Query:</span>
-            <span className="ml-2 font-mono text-xs bg-white px-2 py-1 rounded">"{progress.current_query}"</span>
-          </div>
-        )}
+  <div className="mt-4 p-4 bg-muted rounded-lg border border-border shadow">
+    <div className="grid grid-cols-2 gap-4 text-sm text-foreground">
+      <div>
+        <span className="font-medium text-primary">Current Step:</span>
+        <span className="ml-2 capitalize">{progress.current_step?.replace('_', ' ') || 'Unknown'}</span>
       </div>
+
+      {progress.total_queries && (
+        <div>
+          <span className="font-medium text-primary">Queries:</span>
+          <span className="ml-2">{progress.queries_completed || 0}/{progress.total_queries}</span>
+        </div>
+      )}
+
+      {progress.detected_data_summary && (
+        <div className="col-span-2">
+          <span className="font-medium text-primary">Detected Data:</span>
+          <span className="ml-2">{progress.detected_data_summary.join(', ')}</span>
+        </div>
+      )}
+
+      {progress.current_query && (
+        <div className="col-span-2">
+          <span className="font-medium text-primary">Current Query:</span>
+          <span className="ml-2 font-mono text-xs bg-background px-2 py-1 rounded border border-border">
+            "{progress.current_query}"
+          </span>
+        </div>
+      )}
     </div>
-  );
+  </div>
+);
+
 
   if (loading) {
     return (
