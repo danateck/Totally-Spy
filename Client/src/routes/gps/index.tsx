@@ -23,7 +23,7 @@ export const Route = createFileRoute('/gps/')({
 function RouteComponent() {
   const [location, setLocation] = useState<{ lat: number; lng: number } | null>(null)
   const [error, setError] = useState<string | null>(null)
-
+//update to get the precice location 
   useEffect(() => {
  navigator.geolocation.getCurrentPosition(
   (position) => {
@@ -34,12 +34,12 @@ function RouteComponent() {
   },
   (err) => {
     console.error('Geolocation error:', err)
-    setError('לא ניתן לאחזר מיקום מדויק. בדקי הרשאות.')
+    setError('Unable to retrieve location. Check permissions or try another browser')
   },
   {
-    enableHighAccuracy: true, // 💡 זה מבקש דיוק גבוה
-    timeout: 10000,            // זמן המתנה מרבי (10 שניות)
-    maximumAge: 0              // לא להשתמש במיקום קודם
+    enableHighAccuracy: true, 
+    timeout: 10000,           
+    maximumAge: 0              
   }
 )
 
