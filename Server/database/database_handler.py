@@ -576,11 +576,13 @@ def insert_scan(
                 conn.commit()
                 logger.info(f"Scan history added successfully with ID: {scan_id}")
                 return scan_id
+            
         except psycopg2.Error as e:
             logger.error(f"Error inserting scan history: {e}")
             return None
         finally:
             conn.close()
+            
     return None
 
 

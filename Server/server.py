@@ -215,7 +215,8 @@ async def search_info(image_data: ImageData, user: User = Depends(get_current_us
             
             latitude = image_data.location.lat if image_data.location else None
             longitude = image_data.location.lng if image_data.location else None
-
+            #calling insert scan:
+    
             if detected_data:
                 scan_id = insert_scan(user.username, str_data, best_frame_base64=best_frame_base64, latitude=latitude,
                     longitude=longitude)
