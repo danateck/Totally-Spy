@@ -1,5 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Link, useNavigate } from '@tanstack/react-router'
 import { Logo } from '@/components/logo/logo'
 import WebcamCapture from '@/components/webcam/webcam'
@@ -21,6 +21,7 @@ function RouteComponent() {
   const [alertMessage, setAlertMessage] = useState('')
   const [alertTitle, setAlertTitle] = useState('')
   const [showProfileDropdown, setShowProfileDropdown] = useState(false)
+  const webcamRef = useRef<any>(null)
 
   const handleStartRecording = () => {
     setIsRecording(true)
@@ -28,8 +29,22 @@ function RouteComponent() {
     setShowAlert(false)
   }
 
-  const handleStopRecording = () => {
-    setIsRecording(false)
+  const handleStopRecording = async () => {
+    console.log("Stopping recording...");
+    try {
+      // Call endSession on the webcam component first
+      if (webcamRef.current && webcamRef.current.endSession) {
+        await webcamRef.current.endSession();
+      }
+      // Now set isRecording to false to trigger cleanup
+      setIsRecording(false);
+      // Wait a bit to ensure the session end request is sent
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      setCapturedImage(null);
+      setShowAlert(false);
+    } catch (error) {
+      console.error("Error stopping recording:", error);
+    }
   }
 
   const handleToggleRecording = () => {
@@ -268,18 +283,14 @@ function RouteComponent() {
                     </div>
                   )}
                   <WebcamCapture
+                    ref={webcamRef}
                     onCapture={handleCapture}
                     isRecording={isRecording}
                     onToggleRecording={handleToggleRecording}
+                    onStopRecording={handleStopRecording}
                   />
                 </div>
                 <div className="flex-shrink-0 flex justify-center mt-4">
-                  <button
-                    onClick={handleStopRecording}
-                    className="px-8 py-3 bg-destructive hover:bg-red-600 text-white rounded-lg font-semibold transition-all duration-200"
-                  >
-                    Stop Recording
-                  </button>
                 </div>
               </div>
             ) : capturedImage ? (

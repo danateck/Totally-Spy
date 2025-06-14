@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback, useRef, useImperativeHandle, forwardRef } from "react";
 import Webcam from "react-webcam";
 import { ZoomIn, ZoomOut, Maximize, Minimize, Focus, Settings, RotateCcw, Camera, RefreshCw, X } from "lucide-react";
 import { getFilterStyle, processImage } from "@/lib/image-processing";
@@ -9,25 +9,57 @@ import { CAMERA_CONFIG } from "@/config/camera";
 // No need for custom interface as we're using 'any' type for constraints
 // to bypass TypeScript limitations with the browser APIs
 
-const WebcamCapture: React.FC<{
+interface SessionResults {
+  session_duration: number;
+  total_frames: number;
+  best_frame?: string;
+  location?: [number, number];
+  detected_data: Record<string, string>;
+  confidence_scores: Record<string, number>;
+  all_detected: Record<string, Array<{value: string; count: number}>>;
+}
+
+const WebcamCapture = forwardRef(function WebcamCapture(props: {
   onCapture?: (imageSrc: string) => void;
   isRecording: boolean;
   onToggleRecording?: () => void;
   initialQuality?: QualityLevel;
-}> = ({ onCapture, isRecording, onToggleRecording, initialQuality = "high" }) => {
-  const webcamRef = useRef<Webcam>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const videoRef = useRef<HTMLVideoElement | null>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const intervalRef = useRef<number | undefined>(undefined);
-  const mediaStreamRef = useRef<MediaStream | null>(null);
-  const processedImageRef = useRef<string | null>(null);
-  const lastCaptureTimeRef = useRef<number>(0);
+  onStopRecording?: () => void;
+}, ref) {
+  const { onCapture, isRecording, onToggleRecording, initialQuality = "high", onStopRecording } = props;
+  // State declarations
+  const [isSessionActive, setIsSessionActive] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+  const [position, setPosition] = useState({ x: 0, y: 0 });
+  const [zoomLevel, setZoomLevel] = useState(1);
+  const [quality, setQuality] = useState<QualityLevel>(initialQuality);
+  const [sharpness, setSharpness] = useState(1);
+  const [enhancementLevel, setEnhancementLevel] = useState(1);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isAutoFocusEnabled, setIsAutoFocusEnabled] = useState(true);
+  const [isCameraActive, setIsCameraActive] = useState(true);
+  const [currentCamera, setCurrentCamera] = useState<string>('');
+  const [availableCameras, setAvailableCameras] = useState<MediaDeviceInfo[]>([]);
+  const [opticalZoomSupported, setOpticalZoomSupported] = useState(false);
+  const [maxOpticalZoom, setMaxOpticalZoom] = useState(1);
+  const [sessionResults, setSessionResults] = useState<SessionResults | null>(null);
+  const [facingMode, setFacingMode] = useState<"user" | "environment">("environment");
+  const [selectedCameraId, setSelectedCameraId] = useState<string>("");
+  const [isLoadingCameras, setIsLoadingCameras] = useState(true);
+  const [autoFocus, setAutoFocus] = useState(true);
+  const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' ? window.innerWidth < 768 : false);
 
-  // Add new refs for image capture and scoring
+  // Refs
+  const webcamRef = useRef<Webcam>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const capturedImagesRef = useRef<HTMLImageElement[]>([]);
   const captureIntervalRef = useRef<number | undefined>(undefined);
   const sendIntervalRef = useRef<number | undefined>(undefined);
+  const mediaStreamRef = useRef<MediaStream | null>(null);
 
   // Connect webcam ref to video element for processing
   useEffect(() => {
@@ -35,9 +67,6 @@ const WebcamCapture: React.FC<{
       videoRef.current = webcamRef.current.video;
     }
   }, [webcamRef.current]);
-
-  // State to track screen size for responsive behavior
-  const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' ? window.innerWidth < 768 : false);
 
   // Listen for window resize to update mobile state
   useEffect(() => {
@@ -48,28 +77,6 @@ const WebcamCapture: React.FC<{
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
-  
-  // Quality and enhancement settings
-  const [quality, setQuality] = useState(initialQuality);
-  const [enhancementLevel, setEnhancementLevel] = useState(3);
-  const [sharpness, setSharpness] = useState(2);
-  const [showSettings, setShowSettings] = useState(false);
-  
-  // Camera state
-  const [isCameraActive, setIsCameraActive] = useState(true);
-  const [facingMode, setFacingMode] = useState<"user" | "environment">("environment");
-  const [availableCameras, setAvailableCameras] = useState<MediaDeviceInfo[]>([]);
-  const [selectedCameraId, setSelectedCameraId] = useState<string>("");
-  const [isLoadingCameras, setIsLoadingCameras] = useState(true);
-  
-  // Zoom state - now with optical zoom support
-  const [zoomLevel, setZoomLevel] = useState<number>(1);
-  const [opticalZoomSupported, setOpticalZoomSupported] = useState(false);
-  const [maxOpticalZoom, setMaxOpticalZoom] = useState(1);
-  const [position, setPosition] = useState({ x: 0, y: 0 });
-  const [isDragging, setIsDragging] = useState(false);
-  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
-  const [autoFocus, setAutoFocus] = useState(true);
   
   // Get initial video constraints
   const getVideoConstraints = useCallback(() => {
@@ -178,7 +185,6 @@ const WebcamCapture: React.FC<{
       };
 
       await videoTrack.applyConstraints(constraints);
-      console.log(`Applied optical zoom: ${newZoomLevel}`);
     } catch (error) {
       console.error("Error applying optical zoom:", error);
     }
@@ -280,47 +286,51 @@ const WebcamCapture: React.FC<{
     capturedImagesRef.current = [];
   }, [onCapture]);
 
-  // Handle recording interval
+  // Handle recording state changes
   useEffect(() => {
-    if (isRecording) {
-      // Start capturing images at configured interval
-      captureIntervalRef.current = window.setInterval(captureAndScoreImage, CAMERA_CONFIG.CAPTURE_INTERVAL_MS);
-      
-      // Start sending top images at configured interval
-      sendIntervalRef.current = window.setInterval(sendTopImages, CAMERA_CONFIG.SEND_INTERVAL_MS);
-    } else {
-      // Clear intervals
-      if (captureIntervalRef.current) {
-        window.clearInterval(captureIntervalRef.current);
-      }
-      if (sendIntervalRef.current) {
-        window.clearInterval(sendIntervalRef.current);
-      }
-      // Clear captured images
-      capturedImagesRef.current = [];
+    if (isRecording && !isSessionActive) {
+      startSession();
+    } else if (!isRecording && isSessionActive) {
+      endSession().then(() => {
+        if (captureIntervalRef.current) {
+          window.clearInterval(captureIntervalRef.current);
+          captureIntervalRef.current = undefined;
+        }
+        if (sendIntervalRef.current) {
+          window.clearInterval(sendIntervalRef.current);
+          sendIntervalRef.current = undefined;
+        }
+        capturedImagesRef.current = [];
+      });
     }
+  }, [isRecording]);
 
+  useEffect(() => {
+    if (!isSessionActive) {
+      return;
+    }
+    captureIntervalRef.current = window.setInterval(captureAndScoreImage, CAMERA_CONFIG.CAPTURE_INTERVAL_MS);
+    sendIntervalRef.current = window.setInterval(sendTopImages, CAMERA_CONFIG.SEND_INTERVAL_MS);
     return () => {
       if (captureIntervalRef.current) {
         window.clearInterval(captureIntervalRef.current);
+        captureIntervalRef.current = undefined;
       }
       if (sendIntervalRef.current) {
         window.clearInterval(sendIntervalRef.current);
+        sendIntervalRef.current = undefined;
       }
     };
-  }, [isRecording, captureAndScoreImage, sendTopImages]);
+  }, [isSessionActive]);
 
-  // Add event listeners for mouse movements outside the component
   useEffect(() => {
     const handleGlobalMouseUp = () => {
       setIsDragging(false);
     };
-    
     if (isDragging) {
       window.addEventListener('mouseup', handleGlobalMouseUp);
       window.addEventListener('mouseleave', handleGlobalMouseUp);
     }
-    
     return () => {
       window.removeEventListener('mouseup', handleGlobalMouseUp);
       window.removeEventListener('mouseleave', handleGlobalMouseUp);
@@ -487,13 +497,174 @@ const WebcamCapture: React.FC<{
   
   // Toggle settings panel
   const toggleSettings = () => {
-    setShowSettings(!showSettings);
+    setIsSettingsOpen(!isSettingsOpen);
   };
   
   // Handle quality change
   const changeQuality = (newQuality: QualityLevel) => {
     setQuality(newQuality);
   };
+
+  const startSession = async () => {
+    try {
+      const response = await fetch("/record/session", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: 'include',
+        body: JSON.stringify({ action: "start" }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+
+      if (data.message === "Session started") {
+        setIsSessionActive(true);
+      } else {
+        console.error("Failed to start session:", data);
+        setIsSessionActive(false);
+      }
+    } catch (error) {
+      console.error("Error starting session:", error);
+      setIsSessionActive(false);
+    }
+  };
+
+  const endSession = async () => {
+    try {
+      const response = await fetch("/record/session", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: 'include',
+        body: JSON.stringify({ action: "end" }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+
+      if (data.scan_id) {
+        setSessionResults({
+          session_duration: data.session_duration || 0,
+          total_frames: data.total_frames || 0,
+          detected_data: data.detected_data || {},
+          confidence_scores: data.confidence_scores || {},
+          all_detected: data.all_detected || {},
+          best_frame: data.best_frame,
+          location: data.location
+        });
+      }
+
+      setIsSessionActive(false);
+    } catch (error) {
+      console.error("Error ending session:", error);
+      setIsSessionActive(false);
+    }
+  };
+
+  // Check session status periodically
+  useEffect(() => {
+    let intervalId: number | undefined;
+    
+    if (isSessionActive) {
+      intervalId = window.setInterval(async () => {
+        try {
+          const response = await fetch('/record/session/status', {
+            credentials: 'include',
+          });
+          
+          if (response.ok) {
+            const status = await response.json();
+            if (status.detected_data) {
+              setSessionResults(status);
+            }
+          }
+        } catch (error) {
+          console.error('Error checking session status:', error);
+        }
+      }, 2000); // Check every 2 seconds
+    }
+    
+    return () => {
+      if (intervalId) {
+        window.clearInterval(intervalId);
+      }
+    };
+  }, [isSessionActive]);
+
+  const handleCapture = async () => {
+    if (!webcamRef.current || !isRecording) return;
+    try {
+        const imageSrc = webcamRef.current.getScreenshot();
+        if (!imageSrc) return;
+        let location = null;
+        if (navigator.geolocation) {
+            try {
+                const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+                    navigator.geolocation.getCurrentPosition(resolve, reject, {
+                        enableHighAccuracy: true,
+                        timeout: 5000,
+                        maximumAge: 0
+                    });
+                });
+                location = {
+                    lat: position.coords.latitude,
+                    lng: position.coords.longitude
+                };
+            } catch (error) {
+                console.warn('Error getting location:', error);
+            }
+        }
+        const response = await fetch('/record/img', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                image: imageSrc,
+                location
+            })
+        });
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const data = await response.json();
+        if (data.message && data.message.length > 0) {
+            const detectedData: Record<string, string> = {};
+            data.message.forEach(([value, type]: [string, string]) => {
+                detectedData[type] = value;
+            });
+            setSessionResults(prev => {
+                const now = Date.now();
+                return {
+                    session_duration: prev ? prev.session_duration : 0,
+                    total_frames: (prev?.total_frames || 0) + 1,
+                    detected_data: detectedData,
+                    confidence_scores: prev?.confidence_scores || {},
+                    all_detected: prev?.all_detected || {},
+                    best_frame: prev?.best_frame,
+                    location: prev?.location
+                };
+            });
+        }
+    } catch (error) {
+        console.error('Error capturing image:', error);
+        setMessage('Error capturing image. Please try again.');
+    }
+  };
+
+  // Expose endSession to parent
+  useImperativeHandle(ref, () => ({
+    endSession
+  }));
 
   return (
     <div className={`relative w-full overflow-hidden ${isMobile ? 'h-screen max-h-screen' : 'h-screen'}`}>
@@ -538,7 +709,7 @@ const WebcamCapture: React.FC<{
           <button 
             onClick={toggleSettings}
             className={`${isMobile ? 'p-2' : 'p-3'} rounded-full backdrop-blur-sm transition-all ${
-              showSettings 
+              isSettingsOpen 
                 ? 'bg-blue-500 text-white' 
                 : 'bg-black/70 text-white hover:bg-black/80'
             }`}
@@ -614,7 +785,7 @@ const WebcamCapture: React.FC<{
             <div className="flex items-center justify-center">
               {/* Central camera control button */}
               <button 
-                onClick={toggleCameraActive}
+                onClick={isCameraActive && isRecording && onStopRecording ? onStopRecording : toggleCameraActive}
                 className={`px-6 py-3 rounded-full font-semibold text-sm transition-all ${
                   isCameraActive 
                     ? 'bg-red-500 text-white hover:bg-red-600' 
@@ -622,7 +793,7 @@ const WebcamCapture: React.FC<{
                 }`}
                 title={isCameraActive ? "Stop Camera" : "Start Camera"}
               >
-                {isCameraActive ? '⏹ STOP' : '▶ START'}
+                {isRecording ? '⏹ STOP' : '▶ START'}
               </button>
             </div>
 
@@ -727,7 +898,7 @@ const WebcamCapture: React.FC<{
 
             {/* Camera control button */}
             <button 
-              onClick={toggleCameraActive}
+              onClick={isCameraActive && isRecording && onStopRecording ? onStopRecording : toggleCameraActive}
               className={`px-6 py-3 rounded-full font-semibold transition-all ${
                 isCameraActive 
                   ? 'bg-red-500 text-white hover:bg-red-600' 
@@ -735,7 +906,7 @@ const WebcamCapture: React.FC<{
               }`}
               title={isCameraActive ? "Stop Camera" : "Start Camera"}
             >
-              {isCameraActive ? '⏹ STOP' : '▶ START'}
+              {isRecording ? '⏹ STOP' : '▶ START'}
             </button>
           </div>
         )}
@@ -744,7 +915,7 @@ const WebcamCapture: React.FC<{
       {/* Mobile-optimized slide-out settings panel */}
       <div 
         className={`fixed top-0 right-0 h-full ${isMobile ? 'w-full' : 'w-80'} bg-black/95 backdrop-blur-xl border-l border-white/20 transform transition-transform duration-300 ease-out z-50 ${
-          showSettings ? 'translate-x-0' : 'translate-x-full'
+          isSettingsOpen ? 'translate-x-0' : 'translate-x-full'
         }`}
       >
         {/* Settings header */}
@@ -911,14 +1082,36 @@ const WebcamCapture: React.FC<{
       </div>
       
       {/* Background overlay when settings open */}
-      {showSettings && (
+      {isSettingsOpen && (
         <div 
           className="fixed inset-0 bg-black/50 z-40"
           onClick={toggleSettings}
         />
       )}
+
+      {/* Show current best results */}
+      {sessionResults && (
+        <div className="session-results">
+          <h3>Best Results So Far</h3>
+          <div className="results-grid">
+            {Object.entries(sessionResults.detected_data || {}).map(([type, value]) => (
+              <div key={type} className="result-item">
+                <span className="type">{type}:</span>
+                <span className="value">{value}</span>
+                <span className="confidence">
+                  {sessionResults.confidence_scores?.[type]}% confidence
+                </span>
+              </div>
+            ))}
+          </div>
+          <div className="session-stats">
+            <p>Total Frames: {sessionResults.total_frames}</p>
+            <p>Session Duration: {Math.round(sessionResults.session_duration)}s</p>
+          </div>
+        </div>
+      )}
     </div>
   );
-};
+});
 
 export default WebcamCapture;

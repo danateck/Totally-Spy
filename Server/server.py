@@ -7,6 +7,7 @@ import time
 import random
 import logging
 from typing import Literal, Optional
+import sys
 
 import numpy as np
 from PIL import Image
@@ -18,6 +19,7 @@ from fastapi.responses import HTMLResponse, FileResponse, JSONResponse
 from pydantic import BaseModel
 
 from Data_recognition.data_type_recognition import classify_text
+from Data_recognition.session_manager import SessionManager
 from Enhance_Image.pictureChange import enhance_image
 from OCR.OCRManager import OCRManager
 from database.database_handler import *
@@ -32,6 +34,17 @@ detector = DetectPhone('./YOLO8/best.pt')
 client_path = "../Client/dist/"
 osint_enhancer = OSINTEnhancer()
 osint_progress = {}
+session_manager = SessionManager()  # Initialize session manager
+
+# Configure logging
+logging.basicConfig(
+    level=logging.DEBUG,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler(sys.stdout),
+        logging.FileHandler('server.log')
+    ]
+)
 
 # Configure CORS
 app.add_middleware(
@@ -117,6 +130,9 @@ class BestFrameData(BaseModel):
     scanId: int
     image: str  # base64 string
 
+class SessionRequest(BaseModel):
+    action: Literal["start", "end"]
+
 def convert_to_formatted_string(detected_texts: list[tuple[str, str]]) -> str:
     # Join each tuple into a single line with label and value separated by ':'
     formatted_string = '\n'.join(f"{label}:{value}" for label, value in detected_texts)
@@ -163,11 +179,49 @@ def draw_ocr_boxes_on_image(image, word_data, detected_values, offset_x=0, offse
         
     return image
 
+@app.post("/record/session")
+async def manage_session(request: SessionRequest, user: User = Depends(get_current_user)):
+    """Start or end a recording session"""
+    try:
+        if request.action == "start":
+            session_manager.start_session(str(user.id))
+            return {"message": "Session started"}
+            
+        elif request.action == "end":
+            results = session_manager.end_session(str(user.id))
+            if results:
+                return {
+                    "message": "Session ended",
+                    "scan_id": results.get("scan_id"),
+                    "detected_data": results.get("detected_data", {}),
+                    "total_frames": results.get("total_frames", 0),
+                    "session_duration": results.get("session_duration", 0),
+                    "confidence_scores": results.get("confidence_scores", {}),
+                    "all_detected": results.get("all_detected", {}),
+                    "best_frame": results.get("best_frame"),
+                    "location": results.get("location")
+                }
+            else:
+                return {"message": "No active session found"}
+                
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/record/session/status")
+async def get_session_status(user: User = Depends(get_current_user)):
+    """Get current session status and best results so far"""
+    try:
+        status = session_manager.get_session_status(str(user.id))
+        if status:
+            return status
+        return {"message": "No active session"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.post("/record/img")
 async def search_info(image_data: ImageData, user: User = Depends(get_current_user)):
     try:
         # Check base64 string length (rough estimate of image size)
-        # Base64 increases size by ~33%, so 3MB base64 string ≈ 2MB actual image
         if len(image_data.image) > 3_000_000:  # ~3MB base64 string
             raise HTTPException(
                 status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
@@ -183,58 +237,107 @@ async def search_info(image_data: ImageData, user: User = Depends(get_current_us
                 detail="Invalid image data"
             )
     
-        # Process the frame to extract text and detect relevant data (e.g., OTP)
+        # Process the frame to extract text and detect relevant data
         try:
+            # First try to find phone in the frame
             cord_cropped_image = detector.find_cord_for_phones(frame)
             phone_boxes = find_largest_phone_from_cords(cord_cropped_image)
-            cropped_image = get_phones_from_cords(frame, phone_boxes)
-            if len(cropped_image) > 0:
-                cropped_image = cropped_image[0]
-            else:
-                raise HTTPException(status_code=201, detail="No phone found.")
+            
+            if not phone_boxes:
+                # If no phone found, return early with a specific status code
+                return {
+                    "message": []
+                }
+            
+            # Get the cropped phone image
+            cropped_images = get_phones_from_cords(frame, phone_boxes)
+            if not cropped_images:
+                return {
+                    "message": []
+                }
+            
+            cropped_image = cropped_images[0]
             enhanced_image = enhance_image(cropped_image)
             extracted_text, word_data = ocr_manager.extract_text(enhanced_image)
-            detected_data = classify_text(extracted_text)
-            str_data = convert_to_formatted_string(detected_data)
-
-            detected_values = set(val for val, _ in detected_data)
-
-            annotated_image = enhanced_image.copy()
-            draw_ocr_boxes_on_image(annotated_image, word_data, detected_values, offset_x=0, offset_y=0)
-
-            # Encode the annotated enhanced image as base64 with higher quality and compression
+            
+            # Calculate frame quality score
+            frame_score = get_ocr_score(enhanced_image)
+            
+            # Encode the annotated enhanced image as base64
             encode_params = [int(cv2.IMWRITE_JPEG_QUALITY), 90, int(cv2.IMWRITE_JPEG_OPTIMIZE), 1]
-            _, buffer = cv2.imencode('.jpg', annotated_image, encode_params)
+            _, buffer = cv2.imencode('.jpg', enhanced_image, encode_params)
             best_frame_base64 = base64.b64encode(buffer).decode('utf-8')
             best_frame_base64 = f"data:image/jpeg;base64,{best_frame_base64}"
             
             latitude = image_data.location.lat if image_data.location else None
             longitude = image_data.location.lng if image_data.location else None
 
-            if detected_data:
-                scan_id = insert_scan(user.username, str_data, best_frame_base64=best_frame_base64, latitude=latitude,
-                    longitude=longitude)
-                if scan_id:
-                    return {"message": detected_data}
-                else:
-                    raise HTTPException(status_code=500, detail="Failed to save scan")
-            else:
-                raise HTTPException(status_code=202, detail="No data found.")
-        except HTTPException as he:
-            raise he
+            # Add frame data to session and get current best results
+            results = session_manager.add_frame_data(
+                str(user.id),
+                extracted_text,
+                best_frame_base64=best_frame_base64,
+                location=(latitude, longitude) if latitude and longitude else None,
+                frame_score=frame_score
+            )
+            
+            # Format the response in the requested format
+            formatted_message = []
+            for data_type, value in results.get("detected_data", {}).items():
+                formatted_message.append([value, data_type])
+            
+            return {
+                "message": formatted_message
+            }
+            
         except Exception as e:
+            logging.error(f"Error processing image: {str(e)}")
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Error processing image"
+                detail=f"Error processing image: {str(e)}"
             )
     except HTTPException as he:
         raise he
     except Exception as e:
+        logging.error(f"Server error: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Server error"
+            detail=f"Server error: {str(e)}"
         )
 
+def get_ocr_score(image):
+    """Calculate a quality score for OCR based on image characteristics"""
+    try:
+        # Check if image is already grayscale
+        if len(image.shape) == 2:  # Already grayscale
+            gray = image
+        else:  # Convert from BGR to grayscale
+            gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        
+        # Calculate image statistics
+        mean_brightness = np.mean(gray)
+        std_brightness = np.std(gray)
+        
+        # Calculate contrast score (0-100)
+        contrast_score = min(100, int(std_brightness * 2))
+        
+        # Calculate brightness score (0-100)
+        brightness_score = min(100, int(abs(mean_brightness - 128) * 2))
+        
+        # Calculate blur score using Laplacian variance
+        laplacian_var = cv2.Laplacian(gray, cv2.CV_64F).var()
+        blur_score = min(100, int(laplacian_var / 2))
+        
+        # Combine scores with weights
+        final_score = (
+            contrast_score * 0.4 +  # Contrast is most important
+            brightness_score * 0.3 +  # Brightness is second
+            blur_score * 0.3  # Blur is third
+        )
+        
+        return min(100, int(final_score))
+    except Exception as e:
+        return 50  # Return middle score on error
 
 @app.post("/auth/login")
 async def login(login_data: UserLogin, response: Response):
