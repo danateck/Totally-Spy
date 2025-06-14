@@ -18,10 +18,13 @@ function RouteComponent() {
   const [isRecording, setIsRecording] = useState(false)
   const [capturedImage, setCapturedImage] = useState<string | null>(null)
   const [showAlert, setShowAlert] = useState(false)
-  const [alertMessage, setAlertMessage] = useState('')
+  const [alertMessage, setAlertMessage] = useState<[string, string][]>([])
   const [alertTitle, setAlertTitle] = useState('')
   const [showProfileDropdown, setShowProfileDropdown] = useState(false)
   const webcamRef = useRef<any>(null)
+  const [showOtpToast, setShowOtpToast] = useState(false)
+  const [otpValue, setOtpValue] = useState<string | null>(null)
+  const lastAlertMessageRef = useRef<string>("")
 
   const handleStartRecording = () => {
     setIsRecording(true)
@@ -114,12 +117,27 @@ function RouteComponent() {
 
     const data = await response.json();
 
+    if (data.otp_found) {
+      setOtpValue(data.otp_found);
+      setShowOtpToast(true);
+      setTimeout(() => setShowOtpToast(false), 3000);
+      // Copy to clipboard
+      try {
+        await navigator.clipboard.writeText(data.otp_found);
+      } catch (err) {
+        console.warn('Failed to copy OTP to clipboard:', err);
+      }
+    }
     if (data && data.message && Array.isArray(data.message) && data.message.length > 0) {
       // Check if the first item is not a "No results" message
       if (!data.message[0][0].includes('No')) {
-        setAlertTitle('Found Items');
-        setAlertMessage(data.message);
-        setShowAlert(true);
+        const newMessageString = JSON.stringify(data.message);
+        if (newMessageString !== lastAlertMessageRef.current) {
+          setAlertTitle('Found Items');
+          setAlertMessage(data.message as [string, string][]);
+          setShowAlert(true);
+          lastAlertMessageRef.current = newMessageString;
+        }
       }
     }
   } catch (error) {
@@ -250,16 +268,18 @@ function RouteComponent() {
                   {/* Alert inside camera window */}
                   {showAlert && (
                     <div className="absolute top-2 left-2 z-[100]">
-                      <Alert className="border border-green-500/20 bg-zinc-900/90 shadow-none p-2 rounded-md min-w-[220px] max-w-xs text-xs relative">
+                      <Alert className={`border border-green-500/20 bg-zinc-900/90 shadow-none p-2 rounded-md min-w-[220px] max-w-xs text-xs relative`}>
                         <button
                           onClick={() => setShowAlert(false)}
-                          className="absolute top-1 right-1 text-green-400 hover:text-green-600 text-xs p-1"
+                          className={`absolute top-1 right-1 text-green-400 hover:text-green-600 text-xs p-1`}
                           aria-label="Close"
                         >
                           ×
                         </button>
-                        <AlertTitle className="text-green-400 font-semibold text-xs mb-1">{alertTitle}</AlertTitle>
-                        <AlertDescription className="text-green-400">
+                        <AlertTitle className={`text-green-400 font-semibold text-xs mb-1`}>
+                          {alertTitle}
+                        </AlertTitle>
+                        <AlertDescription className={`text-green-400`}>
                           {(() => {
                             if (!Array.isArray(alertMessage)) return null;
                             const groupedItems = alertMessage.reduce((acc, [value, type]: [string, string]) => {
@@ -323,6 +343,15 @@ function RouteComponent() {
           </div>
         </div>
       </div>
+
+      {/* OTP Toast Notification */}
+      {showOtpToast && otpValue && (
+        <div className="fixed top-6 left-1/2 transform -translate-x-1/2 z-[200]">
+          <div className="bg-yellow-500 text-black font-semibold px-6 py-2 rounded-full shadow-lg border border-yellow-700 text-lg animate-fade-in-out">
+            OTP Copied: <span className="font-mono">{otpValue}</span>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

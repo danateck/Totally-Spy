@@ -286,9 +286,12 @@ async def search_info(image_data: ImageData, user: User = Depends(get_current_us
             for data_type, value in results.get("detected_data", {}).items():
                 formatted_message.append([value, data_type])
             
-            return {
+            response = {
                 "message": formatted_message
             }
+            if "otp_found" in results:
+                response["otp_found"] = results["otp_found"]
+            return response
             
         except Exception as e:
             logging.error(f"Error processing image: {str(e)}")

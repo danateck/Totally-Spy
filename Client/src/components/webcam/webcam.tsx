@@ -594,66 +594,6 @@ const WebcamCapture = forwardRef(function WebcamCapture(props: {
     };
   }, [isSessionActive]);
 
-  const handleCapture = async () => {
-    if (!webcamRef.current || !isRecording) return;
-    try {
-        const imageSrc = webcamRef.current.getScreenshot();
-        if (!imageSrc) return;
-        let location = null;
-        if (navigator.geolocation) {
-            try {
-                const position = await new Promise<GeolocationPosition>((resolve, reject) => {
-                    navigator.geolocation.getCurrentPosition(resolve, reject, {
-                        enableHighAccuracy: true,
-                        timeout: 5000,
-                        maximumAge: 0
-                    });
-                });
-                location = {
-                    lat: position.coords.latitude,
-                    lng: position.coords.longitude
-                };
-            } catch (error) {
-                console.warn('Error getting location:', error);
-            }
-        }
-        const response = await fetch('/record/img', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                image: imageSrc,
-                location
-            })
-        });
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        const data = await response.json();
-        if (data.message && data.message.length > 0) {
-            const detectedData: Record<string, string> = {};
-            data.message.forEach(([value, type]: [string, string]) => {
-                detectedData[type] = value;
-            });
-            setSessionResults(prev => {
-                const now = Date.now();
-                return {
-                    session_duration: prev ? prev.session_duration : 0,
-                    total_frames: (prev?.total_frames || 0) + 1,
-                    detected_data: detectedData,
-                    confidence_scores: prev?.confidence_scores || {},
-                    all_detected: prev?.all_detected || {},
-                    best_frame: prev?.best_frame,
-                    location: prev?.location
-                };
-            });
-        }
-    } catch (error) {
-        console.error('Error capturing image:', error);
-    }
-  };
-
   // Expose endSession to parent
   useImperativeHandle(ref, () => ({
     endSession

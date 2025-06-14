@@ -131,14 +131,24 @@ class SessionManager:
             
         # Classify and count the data
         detected_data = classify_text(text)
+        otp_value = None
         for value, data_type in detected_data:
-            # Skip OTPs as they are time-sensitive
-            if data_type == "OTP":
-                continue
+            # Count all data types including OTP
             session.data_counts[data_type][value] += 1
-            
-        # Return current best results
-        return self._analyze_session_data(session)
+            # If this is an OTP, store it for potential return
+            if data_type == "OTP":
+                otp_value = value
+        
+        # Get current best results
+        results = self._analyze_session_data(session)
+        
+        # Only return OTP if it's the most frequent value in its category
+        if otp_value and "OTP" in session.data_counts:
+            otp_counts = session.data_counts["OTP"]
+            if otp_value == max(otp_counts.items(), key=lambda x: x[1])[0]:
+                results["otp_found"] = otp_value
+                
+        return results
             
     def _analyze_session_data(self, session: SessionData) -> Dict:
         """Analyze the collected data to find the most frequent items"""
