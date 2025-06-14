@@ -58,50 +58,55 @@ function RouteComponent() {
 
  const handleCapture = async (imageSrc: string) => {
   try {
-    
-    navigator.geolocation.getCurrentPosition(
-      async (position) => {
-        const latitude = position.coords.latitude;
-        const longitude = position.coords.longitude;
+    // Create the base request body without location
+    const requestBody: any = {
+      image: imageSrc.split(',')[1], // Base64 without prefix
+    };
 
-        const response = await fetch('/record/img', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          credentials: 'include',
-          body: JSON.stringify({
-            image: imageSrc.split(',')[1], // Base64 without prefix
-            location: {
-              lat: latitude,
-              lng: longitude,
-            },
-          }),
+    // Try to get location, but don't block the request if it fails
+    try {
+      const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject, {
+          timeout: 5000, // 5 second timeout
+          maximumAge: 0,
+          enableHighAccuracy: true
         });
+      });
 
-        if (!response.ok) {
-          console.error('Failed to send image to server');
-          return;
-        }
+      // If we got location, add it to the request
+      requestBody.location = {
+        lat: position.coords.latitude,
+        lng: position.coords.longitude,
+      };
+    } catch (locationError) {
+      console.log('Location not available, proceeding without location data');
+    }
 
-        const data: ApiResponseFoundCode = await response.json();
-
-        if (data && data.message && Array.isArray(data.message) && data.message.length > 0) {
-          if (!data.message[0].includes('No')) {
-            setAlertTitle(data.message[0] || 'Success');
-            setAlertMessage(data.message[1] || 'Code found!');
-            setShowAlert(true);
-          }
-        }
+    // Send the request to the server
+    const response = await fetch('/record/img', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
       },
-      (error) => {
-        console.error('GPS Error:', error);
-        setAlertTitle('Location Error');
-        setAlertMessage('We could not track your GPS location');
+      credentials: 'include',
+      body: JSON.stringify(requestBody),
+    });
+
+    if (!response.ok) {
+      console.error('Failed to send image to server');
+      return;
+    }
+
+    const data = await response.json();
+
+    if (data && data.message && Array.isArray(data.message) && data.message.length > 0) {
+      // Check if the first item is not a "No results" message
+      if (!data.message[0][0].includes('No')) {
+        setAlertTitle('Found Items');
+        setAlertMessage(data.message);
         setShowAlert(true);
       }
-    );
-
+    }
   } catch (error) {
     console.error('Error sending image:', error);
   }
@@ -222,47 +227,46 @@ function RouteComponent() {
       <div className="flex-1 px-4 pb-4 flex flex-col min-h-0">
         <div className="bg-card border border-border rounded-xl shadow-2xl p-4 flex-1 flex flex-col min-h-0">
           
-          {/* Alert */}
-          {showAlert && (
-            <div className="flex-shrink-0 mb-4">
-              <Alert className="border border-green-500/20 bg-green-500/10">
-                <AlertTitle className="text-green-400">{alertTitle}</AlertTitle>
-                <AlertDescription className="text-green-400">
-                  {(() => {
-                    if (typeof alertMessage !== 'string' || !alertMessage.trim()) return null;
-                    // Split by ' - ' to get each pair
-                    const rawPairs = alertMessage.split(' - ').map(s => s.trim()).filter(Boolean);
-                    // Parse each pair into [value, type]
-                    const pairs = rawPairs.map(pair => {
-                      const lastComma = pair.lastIndexOf(',');
-                      if (lastComma === -1) return [pair, ''];
-                      return [pair.slice(0, lastComma), pair.slice(lastComma + 1)];
-                    });
-                    // Remove POTENTIALLY_SENSITIVE if a duplicate value exists with a different type
-                    const seen = new Map();
-                    for (const [found, type] of pairs) {
-                      if (!seen.has(found)) {
-                        seen.set(found, type);
-                      } else if (type !== "POTENTIALLY_SENSITIVE") {
-                        seen.set(found, type); // Prefer non-sensitive type
-                      }
-                    }
-                    return Array.from(seen.entries()).map(([found, type], idx) => (
-                      <div key={idx}>
-                        <b>{found}</b>: {type}
-                      </div>
-                    ));
-                  })()}
-                </AlertDescription>
-              </Alert>
-            </div>
-          )}
-
           {/* Camera/Content Area */}
           <div className="flex-1 flex flex-col items-center justify-center min-h-0">
             {isRecording ? (
               <div className="w-full h-full flex flex-col">
-                <div className="flex-1 bg-black rounded-lg overflow-hidden" style={{ minHeight: 'calc(100vh - 400px)' }}>
+                <div className="flex-1 bg-black rounded-lg overflow-hidden relative" style={{ minHeight: 'calc(100vh - 400px)' }}>
+                  {/* Alert inside camera window */}
+                  {showAlert && (
+                    <div className="absolute top-2 left-2 z-[100]">
+                      <Alert className="border border-green-500/20 bg-zinc-900/90 shadow-none p-2 rounded-md min-w-[220px] max-w-xs text-xs relative">
+                        <button
+                          onClick={() => setShowAlert(false)}
+                          className="absolute top-1 right-1 text-green-400 hover:text-green-600 text-xs p-1"
+                          aria-label="Close"
+                        >
+                          ×
+                        </button>
+                        <AlertTitle className="text-green-400 font-semibold text-xs mb-1">{alertTitle}</AlertTitle>
+                        <AlertDescription className="text-green-400">
+                          {(() => {
+                            if (!Array.isArray(alertMessage)) return null;
+                            const groupedItems = alertMessage.reduce((acc, [value, type]: [string, string]) => {
+                              if (!acc[type]) {
+                                acc[type] = [];
+                              }
+                              acc[type].push(value);
+                              return acc;
+                            }, {} as Record<string, string[]>);
+                            return (Object.entries(groupedItems) as [string, string[]][]).map(([type, values]) => (
+                              <div key={type} className="mb-0.5">
+                                <span className="font-semibold mr-1">{type}:</span>
+                                {values.map((value: string, idx: number) => (
+                                  <span key={idx} className="ml-1 inline-block">{value}</span>
+                                ))}
+                              </div>
+                            ));
+                          })()}
+                        </AlertDescription>
+                      </Alert>
+                    </div>
+                  )}
                   <WebcamCapture
                     onCapture={handleCapture}
                     isRecording={isRecording}
