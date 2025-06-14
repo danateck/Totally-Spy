@@ -190,20 +190,15 @@ async def search_info(image_data: ImageData, user: User = Depends(get_current_us
             cropped_image = get_phones_from_cords(frame, phone_boxes)
             if len(cropped_image) > 0:
                 cropped_image = cropped_image[0]
-                # Get the crop rectangle for offset
-                x1, y1, x2, y2, _ = phone_boxes[0]
             else:
                 raise HTTPException(status_code=201, detail="No phone found.")
             enhanced_image = enhance_image(cropped_image)
-            # Use OCR to get both text and bounding boxes
             extracted_text, word_data = ocr_manager.extract_text(enhanced_image)
             detected_data = classify_text(extracted_text)
             str_data = convert_to_formatted_string(detected_data)
 
-            # Only draw for detected values
             detected_values = set(val for val, _ in detected_data)
 
-            # Draw boxes on the enhanced image (where OCR was actually performed)
             annotated_image = enhanced_image.copy()
             draw_ocr_boxes_on_image(annotated_image, word_data, detected_values, offset_x=0, offset_y=0)
 
@@ -220,7 +215,7 @@ async def search_info(image_data: ImageData, user: User = Depends(get_current_us
                 scan_id = insert_scan(user.username, str_data, best_frame_base64=best_frame_base64, latitude=latitude,
                     longitude=longitude)
                 if scan_id:
-                    return {"message": detected_data, "scan_id": scan_id, "debug_word_data": word_data}
+                    return {"message": detected_data}
                 else:
                     raise HTTPException(status_code=500, detail="Failed to save scan")
             else:
