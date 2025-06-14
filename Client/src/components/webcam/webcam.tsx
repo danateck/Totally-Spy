@@ -29,7 +29,6 @@ const WebcamCapture = forwardRef(function WebcamCapture(props: {
   const { onCapture, isRecording, onToggleRecording, initialQuality = "high", onStopRecording } = props;
   // State declarations
   const [isSessionActive, setIsSessionActive] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const [position, setPosition] = useState({ x: 0, y: 0 });
@@ -38,16 +37,13 @@ const WebcamCapture = forwardRef(function WebcamCapture(props: {
   const [sharpness, setSharpness] = useState(1);
   const [enhancementLevel, setEnhancementLevel] = useState(1);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [isAutoFocusEnabled, setIsAutoFocusEnabled] = useState(true);
   const [isCameraActive, setIsCameraActive] = useState(true);
-  const [currentCamera, setCurrentCamera] = useState<string>('');
   const [availableCameras, setAvailableCameras] = useState<MediaDeviceInfo[]>([]);
   const [opticalZoomSupported, setOpticalZoomSupported] = useState(false);
   const [maxOpticalZoom, setMaxOpticalZoom] = useState(1);
   const [sessionResults, setSessionResults] = useState<SessionResults | null>(null);
   const [facingMode, setFacingMode] = useState<"user" | "environment">("environment");
   const [selectedCameraId, setSelectedCameraId] = useState<string>("");
-  const [isLoadingCameras, setIsLoadingCameras] = useState(true);
   const [autoFocus, setAutoFocus] = useState(true);
   const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' ? window.innerWidth < 768 : false);
 
@@ -107,7 +103,6 @@ const WebcamCapture = forwardRef(function WebcamCapture(props: {
 
   // Load available cameras
   const loadCameras = useCallback(async () => {
-    setIsLoadingCameras(true);
     try {
       const devices = await navigator.mediaDevices.enumerateDevices();
       const videoDevices = devices.filter(device => device.kind === 'videoinput');
@@ -125,7 +120,6 @@ const WebcamCapture = forwardRef(function WebcamCapture(props: {
     } catch (error) {
       console.error("Error accessing media devices:", error);
     } finally {
-      setIsLoadingCameras(false);
     }
   }, [selectedCameraId]);
 
@@ -657,7 +651,6 @@ const WebcamCapture = forwardRef(function WebcamCapture(props: {
         }
     } catch (error) {
         console.error('Error capturing image:', error);
-        setMessage('Error capturing image. Please try again.');
     }
   };
 
