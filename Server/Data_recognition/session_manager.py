@@ -28,58 +28,34 @@ class SessionManager:
     def end_session(self, user_id: str) -> Optional[Dict]:
         """End a session and return the analyzed results"""
         try:
-            print(f"\n=== Ending Session ===")
-            print(f"User ID: {user_id}")
-            print(f"Active sessions: {list(self.active_sessions.keys())}")
-            
             if user_id not in self.active_sessions:
-                print("No active session found")
                 return None
             
             session = self.active_sessions[user_id]
             session.end_time = time.time()
             
-            print(f"Session data before analysis:")
-            print(f"- Start time: {session.start_time}")
-            print(f"- End time: {session.end_time}")
-            print(f"- Total frames: {session.total_frames}")
-            print(f"- Data counts: {dict(session.data_counts)}")
-            
             # Analyze the collected data
             results = self._analyze_session_data(session)
-            print(f"Analysis results: {results}")
             
             # Format data for database storage
             formatted_data = []
             
-            print("\nProcessing data for database:")
             for data_type, value_counts in session.data_counts.items():
-                print(f"\nCategory: {data_type}")
-                print(f"Items found: {len(value_counts)}")
-                print(f"Value counts: {dict(value_counts)}")
-                
                 if data_type == "POTENTIALLY_SENSITIVE":
                     # Add all potentially sensitive items
                     for value, count in value_counts.items():
                         if count > 1:  # Only include if found more than once
                             formatted_data.append((value, data_type))
-                            print(f"Adding sensitive item: {value} (count: {count})")
                 else:
                     # For other categories, add only the most frequent item
                     if value_counts:
                         most_frequent = max(value_counts.items(), key=lambda x: x[1])
                         if most_frequent[1] > 1:  # Only include if found more than once
                             formatted_data.append((most_frequent[0], data_type))
-                            print(f"Adding most frequent {data_type}: {most_frequent[0]} (count: {most_frequent[1]})")
-            
-            print(f"\nTotal items to save: {len(formatted_data)}")
-            print(f"Formatted data: {formatted_data}")
             
             # Convert to string format for database
             formatted_string = '\n'.join(f"{label}:{value}" for value, label in formatted_data)
-            print(f"\nFormatted string for database:\n{formatted_string}")
             
-            print("\nSaving to database...")
             # Save to database
             from database.database_handler import insert_scan, get_user_name
             username = get_user_name(int(user_id)) if user_id.isdigit() else user_id
@@ -92,23 +68,14 @@ class SessionManager:
             )
             
             if scan_id:
-                print(f"Successfully saved scan with ID: {scan_id}")
                 results["scan_id"] = scan_id
-            else:
-                print("Failed to save scan to database")
             
             # Clean up
             del self.active_sessions[user_id]
-            print("Session cleaned up")
             
             return results
             
         except Exception as e:
-            print(f"\nERROR in end_session:")
-            print(f"Error type: {type(e)}")
-            print(f"Error message: {str(e)}")
-            import traceback
-            print(f"Traceback: {traceback.format_exc()}")
             return None
         
     def add_frame_data(self, user_id: str, text: str, best_frame_base64: Optional[str] = None, 
@@ -193,14 +160,9 @@ class SessionManager:
         
     def get_session_status(self, user_id: str) -> Optional[Dict]:
         """Get the current status of a session without ending it"""
-        print(f"\n=== Getting Session Status ===")
-        print(f"User ID: {user_id}")
-        print(f"Active sessions: {list(self.active_sessions.keys())}")
         
         if user_id not in self.active_sessions:
-            print("No active session found")
             return None
             
         session = self.active_sessions[user_id]
-        print(f"Session data: {session}")
         return self._analyze_session_data(session)
