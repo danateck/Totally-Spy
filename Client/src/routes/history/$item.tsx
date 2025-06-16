@@ -596,8 +596,8 @@ function RouteComponent() {
               <Button 
                 disabled={picShow || picLoading}
                 onClick={handleShowPicture}
-                className={`w-full bg-blue-600 text-white rounded-lg transition-all duration-150
-                  ${picLoading ? 'opacity-60 cursor-not-allowed' : 'hover:bg-blue-700 active:scale-95'}
+                className={`w-full bg-green-600 text-white rounded-lg transition-all duration-150
+                  ${picLoading ? 'opacity-60 cursor-not-allowed' : 'hover:hover:bg-green-700 active:scale-95'}
                   ${picShow ? 'opacity-60 cursor-not-allowed' : ''}`}
               >
                 {picLoading ? (
