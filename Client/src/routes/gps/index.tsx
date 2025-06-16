@@ -1,3 +1,7 @@
+/*
+  here we add a gps location for every data that is collected 
+  we showcase a map and a text with the location detected during the time of the recording
+*/
 import { createFileRoute } from '@tanstack/react-router'
 import { useEffect, useState } from 'react'
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet'
