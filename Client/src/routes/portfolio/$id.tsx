@@ -952,17 +952,6 @@ function PortfolioComponent() {
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
             <h2 className="text-lg sm:text-xl font-semibold">Records</h2>
             <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
-              <Link
-                to="/gps/$gps-portfolio"
-                params={{ "gps-portfolio": id }}
-                className="px-3 py-2 sm:px-4 sm:py-2 bg-green-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors flex items-center w-fit text-sm sm:text-base"
-              >
-                <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                </svg>
-                GPS Folder
-              </Link>
               <button
                 onClick={() => fetchPortfolioData()}
                 disabled={loading}

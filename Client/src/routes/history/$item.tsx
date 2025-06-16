@@ -581,7 +581,7 @@ function RouteComponent() {
               <div className="flex flex-col items-center gap-2">
                 <button
                   onClick={handleOSINTEnhance}
-                  className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                  className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
                 >
                   <Eye className="w-4 h-4" />
                   <span className="text-sm sm:text-base">Enhance with OSINT</span>
@@ -596,8 +596,8 @@ function RouteComponent() {
               <Button 
                 disabled={picShow || picLoading}
                 onClick={handleShowPicture}
-                className={`w-full bg-blue-600 text-white rounded-lg transition-all duration-150
-                  ${picLoading ? 'opacity-60 cursor-not-allowed' : 'hover:bg-blue-700 active:scale-95'}
+                className={`w-full bg-green-600 text-white rounded-lg transition-all duration-150
+                  ${picLoading ? 'opacity-60 cursor-not-allowed' : 'hover:hover:bg-green-700 active:scale-95'}
                   ${picShow ? 'opacity-60 cursor-not-allowed' : ''}`}
               >
                 {picLoading ? (
@@ -609,7 +609,7 @@ function RouteComponent() {
                     Loading...
                   </span>
                 ) : (
-                  'Show screenshot'
+                  'Show Screenshot'
                 )}
               </Button>
               {showPicError && (
