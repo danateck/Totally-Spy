@@ -1,26 +1,37 @@
-// Calculating sharpness using a Laplacian
+/* Calculating sharpness using a Laplacian
+ using a grading system we rate screenshots by sharpness, contrass and colorfulness
+ this will help us find the best picture to extract the text from
+*/
 function calculateSharpnessLaplacian(imageData, width, height) {
     const data = imageData.data;
+    const gray = new Float32Array(width * height);
     let total = 0;
 
-    const getGray = (x, y) => {
-        const i = (y * width + x) * 4;
-        return 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
-    };
+    // Precompute grayscale values
+    for (let y = 0; y < height; y++) {
+        for (let x = 0; x < width; x++) {
+            const i = (y * width + x) * 4;
+            gray[y * width + x] = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+        }
+    }
 
+    // Apply 3x3 Laplacian filter
     for (let y = 1; y < height - 1; y++) {
         for (let x = 1; x < width - 1; x++) {
+            const i = y * width + x;
             const laplacian =
-                -1 * getGray(x - 1, y - 1) + -1 * getGray(x, y - 1) + -1 * getGray(x + 1, y - 1) +
-                -1 * getGray(x - 1, y)     +  8 * getGray(x, y)     + -1 * getGray(x + 1, y) +
-                -1 * getGray(x - 1, y + 1) + -1 * getGray(x, y + 1) + -1 * getGray(x + 1, y + 1);
+                -1 * gray[i - width - 1] + -1 * gray[i - width] + -1 * gray[i - width + 1] +
+                -1 * gray[i - 1]         +  8 * gray[i]         + -1 * gray[i + 1] +
+                -1 * gray[i + width - 1] + -1 * gray[i + width] + -1 * gray[i + width + 1];
 
             total += laplacian * laplacian;
         }
     }
-
-    return total / (width * height);
+    //only calculate valif pixels (no edges)
+    const validPixelCount = (width - 2) * (height - 2);
+    return total / validPixelCount;
 }
+
 
 // Calculating contrast using standard deviation of grayscale
 function calculateContrast(imageData) {
