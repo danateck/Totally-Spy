@@ -577,23 +577,21 @@ function RouteComponent() {
               </div>
             </div>
             
- <div className="pt-4 border-t border-border space-y-3">
-  <div className="flex flex-col items-center gap-2">
-    <button
-      onClick={handleOSINTEnhance}
-      className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-    >
-      <Eye className="w-4 h-4" />
-      <span className="text-sm sm:text-base">Enhance with OSINT</span>
-      <ArrowRight className="w-4 h-4" />
-    </button>
-    
-    <div className="text-xs text-gray-500 text-center">
-      Click to start OSINT intelligence gathering
-    </div>
-  </div>
-</div>
-
+            <div className="pt-4 border-t border-border space-y-3">
+              <div className="flex flex-col items-center gap-2">
+                <button
+                  onClick={handleOSINTEnhance}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                >
+                  <Eye className="w-4 h-4" />
+                  <span className="text-sm sm:text-base">Enhance with OSINT</span>
+                  <ArrowRight className="w-4 h-4" />
+                </button>
+                
+                <div className="text-xs text-gray-500 text-center">
+                  Click to start OSINT intelligence gathering
+                </div>
+              </div>
 
               <Button 
                 disabled={picShow || picLoading}
