@@ -54,7 +54,6 @@ create_portfolio_tables()
 ensure_scan_history_columns()
 
 
-
 class UserLogin(BaseModel):
     username: str
     password: str
@@ -198,7 +197,7 @@ async def search_info(image_data: ImageData, user: User = Depends(get_current_us
             # Use OCR to get both text and bounding boxes
             extracted_text, word_data = ocr_manager.extract_text(enhanced_image)
             detected_data = classify_text(extracted_text)
-            str_data = convert_to_formatted_string(detected_data)
+            
 
             # Only draw for detected values
             detected_values = set(val for val, _ in detected_data)
@@ -216,15 +215,18 @@ async def search_info(image_data: ImageData, user: User = Depends(get_current_us
             latitude = image_data.location.lat if image_data.location else None
             longitude = image_data.location.lng if image_data.location else None
 
-            if detected_data:
+            detected_values = [(val, key) for val, key in detected_data if val.strip()]
+            if not detected_values:
+                raise HTTPException(status_code=202, detail="No usable data found.")
+            else:
+                str_data = convert_to_formatted_string(detected_values)
                 scan_id = insert_scan(user.username, str_data, best_frame_base64=best_frame_base64, latitude=latitude,
                     longitude=longitude)
                 if scan_id:
                     return {"message": detected_data, "scan_id": scan_id, "debug_word_data": word_data}
                 else:
                     raise HTTPException(status_code=500, detail="Failed to save scan")
-            else:
-                raise HTTPException(status_code=202, detail="No data found.")
+          
         except HTTPException as he:
             raise he
         except Exception as e:
