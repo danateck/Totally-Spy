@@ -8,7 +8,7 @@ from fastapi import HTTPException
 import logging
 from typing import Optional
 from datetime import datetime
-
+import pytz
 from pydantic import BaseModel
 
 # Load environment variables from .env file
@@ -559,7 +559,8 @@ def insert_scan(
                     logger.warning("Encryption failed!")
                     return None
                 
-                current_time = datetime.now()
+                tz = pytz.timezone('Asia/Jerusalem')
+                current_time = datetime.now(tz)
                 default_name = f"{current_time.strftime('%d %b %Y %H:%M')} Recording"
 
                 
