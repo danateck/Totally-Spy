@@ -609,7 +609,7 @@ function RouteComponent() {
                     Loading...
                   </span>
                 ) : (
-                  'Show screenshot'
+                  'Show Screenshot'
                 )}
               </Button>
               {showPicError && (
