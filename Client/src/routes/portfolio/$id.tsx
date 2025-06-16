@@ -3,6 +3,7 @@ import { Logo } from '@/components/logo/logo'
 import { ScanDetails } from '@/components/scan-details'
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { useAuth } from '@/hooks/useAuth'
+import { Header } from '@/components/header/header'
 
 interface Scan {
   id: number
@@ -56,21 +57,8 @@ function PortfolioComponent() {
     }, [navigate])
     return null
   }
-  
-  const { logout } = authData
-  const [showProfileDropdown, setShowProfileDropdown] = useState(false)
 
-  // Move handleSignOut to the top so it's available in early returns
-  const handleSignOut = async () => {
-    try {
-      await logout()
-      navigate({ to: '/login' })
-    } catch (error) {
-      console.error('Sign out error:', error)
-      // Force navigation even if logout fails
-      navigate({ to: '/login' })
-    }
-  }
+  const [showProfileDropdown, setShowProfileDropdown] = useState(false)
 
   // Handle click outside to close profile dropdown - move this up too
   useEffect(() => {
@@ -92,107 +80,17 @@ function PortfolioComponent() {
       <div className="min-h-screen bg-background text-foreground"
         style={{ backgroundImage: "url('/images/background.jpg')" }}>
         
-        {/* Header with Profile */}
-        <div className="sticky top-0 z-50 bg-background/80 backdrop-blur-sm border-b border-border">
-          <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex items-center justify-between h-14 sm:h-16">
-              {/* Left side - Page title */}
-              <div className="flex items-center space-x-2 sm:space-x-3 flex-1 min-w-0">
-                <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                  <svg className="w-3 h-3 sm:w-4 sm:h-4 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                  </svg>
-                </div>
-                <h1 className="text-base sm:text-lg font-semibold text-foreground truncate">Portfolio</h1>
-                
-                {/* Back to History button - hidden on very small screens, visible on sm+ */}
-                <Link
-                  to="/history"
-                  className="hidden sm:flex items-center px-2 py-1 sm:px-3 sm:py-1.5 bg-secondary/10 hover:bg-secondary/20 rounded-lg transition-colors ml-2 sm:ml-4"
-                  title="Back to History"
-                >
-                  <svg className="w-3 h-3 sm:w-4 sm:h-4 text-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                  </svg>
-                  <span className="ml-1 text-xs sm:text-sm font-medium text-secondary">History</span>
-                </Link>
-              </div>
-
-              {/* Right side - Profile dropdown and mobile back button */}
-              <div className="flex items-center space-x-2">
-                {/* Mobile-only back button */}
-                <Link
-                  to="/history"
-                  className="sm:hidden flex items-center justify-center p-2 bg-secondary/10 hover:bg-secondary/20 rounded-lg transition-colors"
-                  title="Back to History"
-                >
-                  <svg className="w-4 h-4 text-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                  </svg>
-                </Link>
-                
-                {/* Profile dropdown */}
-                <div className="relative" data-profile-dropdown>
-                  <button
-                    onClick={() => setShowProfileDropdown(!showProfileDropdown)}
-                    className="flex items-center space-x-1 sm:space-x-2 px-2 sm:px-3 py-2 rounded-lg bg-card hover:bg-accent transition-colors border border-border"
-                  >
-                    <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-primary/20 flex items-center justify-center">
-                      <svg className="w-3 h-3 sm:w-4 sm:h-4 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                      </svg>
-                    </div>
-                    <span className="text-xs sm:text-sm font-medium hidden xs:inline">Profile</span>
-                    <svg className={`w-3 h-3 sm:w-4 sm:h-4 transition-transform ${showProfileDropdown ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                    </svg>
-                  </button>
-
-                  {/* Dropdown menu */}
-                  {showProfileDropdown && (
-                    <div className="absolute right-0 mt-2 w-40 sm:w-48 bg-card rounded-lg shadow-lg border border-border z-50">
-                      <div className="py-1">
-                        <Link
-                          to="/profile"
-                          className="flex items-center px-3 sm:px-4 py-2 text-xs sm:text-sm text-foreground hover:bg-accent transition-colors"
-                          onClick={() => setShowProfileDropdown(false)}
-                        >
-                          <svg className="w-3 h-3 sm:w-4 sm:h-4 mr-2 sm:mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                          </svg>
-                          My Profile
-                        </Link>
-                        <Link
-                          to="/my-requests"
-                          className="flex items-center px-3 sm:px-4 py-2 text-xs sm:text-sm text-foreground hover:bg-accent transition-colors"
-                          onClick={() => setShowProfileDropdown(false)}
-                        >
-                          <svg className="w-3 h-3 sm:w-4 sm:h-4 mr-2 sm:mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                          </svg>
-                          My Requests
-                        </Link>
-                        <div className="border-t border-border my-1"></div>
-                        <button
-                          onClick={() => {
-                            setShowProfileDropdown(false)
-                            handleSignOut()
-                          }}
-                          className="flex items-center w-full px-3 sm:px-4 py-2 text-xs sm:text-sm text-destructive hover:bg-destructive/10 transition-colors"
-                        >
-                          <svg className="w-3 h-3 sm:w-4 sm:h-4 mr-2 sm:mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                          </svg>
-                          Sign Out
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+        <Header 
+          title="Portfolio"
+          icon={
+            <svg className="w-3 h-3 sm:w-4 sm:h-4 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+            </svg>
+          }
+          showBackButton={true}
+          backTo="/history"
+          backTitle="Back to History"
+        />
 
         <div className="max-w-2xl mx-auto py-12 px-4">
           <Logo className="mb-12" />
@@ -244,7 +142,6 @@ function PortfolioComponent() {
   // Fetch users for autocomplete based on search term
   const fetchUsers = async (searchTerm: string) => {
     try {
-      console.log('Fetching users with search term:', searchTerm)
       
       const response = await fetch(`/users/search?q=${encodeURIComponent(searchTerm)}`, {
         credentials: 'include',
@@ -259,7 +156,6 @@ function PortfolioComponent() {
       }
       
       const userData = await response.json()
-      console.log('Received user data:', userData)
       
       return userData.users || []
     } catch (err) {
@@ -270,10 +166,8 @@ function PortfolioComponent() {
 
   // Filter users based on input with debounced API calls
   const filterUsers = async (searchTerm: string) => {
-    console.log('🔍 Searching for users with term:', searchTerm)
     
     if (!searchTerm) {
-      console.log('❌ Empty search term, hiding dropdown')
       setFilteredUsers([])
       setShowUserDropdown(false)
       return
@@ -282,39 +176,21 @@ function PortfolioComponent() {
     try {
       // Fetch users from API
       const users = await fetchUsers(searchTerm)
-      console.log('📊 API returned users:', users)
       
       if (!users || users.length === 0) {
-        console.log('❌ No users found from API')
         setFilteredUsers([])
         setShowUserDropdown(true) // Show dropdown with "no results" message
         return
       }
       
-      // Get existing member usernames
-      const existingUsernames = members.map(m => m.username)
-      console.log('👥 Existing portfolio members:', existingUsernames)
-      
-      // Show ALL users from API (don't filter out existing members for debugging)
-      const allUsersWithStatus = users.map((user: User) => ({
-        ...user,
-        isExistingMember: existingUsernames.includes(user.username)
-      }))
-      
-      console.log('📋 All users with member status:', allUsersWithStatus)
-      
       // For now, let's show all users (including existing members) to debug
       const filtered = users.slice(0, 10) // Show all results, limit to 10
-      
-      console.log('✅ Final filtered users (showing all):', filtered)
-      console.log('👀 Will show dropdown:', true)
       
       setFilteredUsers(filtered)
       setShowUserDropdown(true) // Always show if we have any results
       setSelectedUserIndex(-1)
       
     } catch (err) {
-      console.error('❌ Error filtering users:', err)
       setFilteredUsers([])
       setShowUserDropdown(false)
     }
@@ -411,10 +287,8 @@ function PortfolioComponent() {
         throw new Error(errorData.detail || 'Failed to fetch portfolio data')
       }
       const portfolioData = await portfolioResponse.json()
-      console.log('Portfolio data:', portfolioData)
 
       // Fetch portfolio scans
-      console.log('Fetching scans for portfolio:', id)
       const scansResponse = await fetch(`/portfolio/${id}/scans`, {
         credentials: 'include',
         headers: {
@@ -428,7 +302,6 @@ function PortfolioComponent() {
         throw new Error(errorData.detail || 'Failed to fetch portfolio scans')
       }
       const scansData = await scansResponse.json()
-      console.log('Raw scans data from portfolio endpoint:', scansData)
 
       // Transform scans data from array format to object format
       const transformedScans = scansData.scans.map(([id, date, name]: [number, string, string]) => {
@@ -441,7 +314,6 @@ function PortfolioComponent() {
           date
         }
       })
-      console.log('Transformed scans for ScanDetails:', transformedScans)
 
       // Fetch portfolio members
       const membersResponse = await fetch(`/portfolio/${id}/members`, {
@@ -463,7 +335,6 @@ function PortfolioComponent() {
         role
       }))
       
-      console.log('Setting portfolio data:', { name: portfolioData.name, role: portfolioData.role })
       setPortfolio({ name: portfolioData.name, role: portfolioData.role })
       setScans(transformedScans)
       setMembers(transformedMembers)
@@ -705,107 +576,17 @@ function PortfolioComponent() {
     <div className="min-h-screen bg-background text-foreground"
       style={{ backgroundImage: "url('/images/background.jpg')" }}>
       
-      {/* Header with Profile */}
-      <div className="sticky top-0 z-50 bg-background/80 backdrop-blur-sm border-b border-border">
-        <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-14 sm:h-16">
-            {/* Left side - Page title */}
-            <div className="flex items-center space-x-2 sm:space-x-3 flex-1 min-w-0">
-              <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                <svg className="w-3 h-3 sm:w-4 sm:h-4 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                </svg>
-              </div>
-              <h1 className="text-base sm:text-lg font-semibold text-foreground truncate">{portfolio?.name || 'Portfolio'}</h1>
-              
-              {/* Back to History button - hidden on very small screens, visible on sm+ */}
-              <Link
-                to="/history"
-                className="hidden sm:flex items-center px-2 py-1 sm:px-3 sm:py-1.5 bg-secondary/10 hover:bg-secondary/20 rounded-lg transition-colors ml-2 sm:ml-4"
-                title="Back to History"
-              >
-                <svg className="w-3 h-3 sm:w-4 sm:h-4 text-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                </svg>
-                <span className="ml-1 text-xs sm:text-sm font-medium text-secondary">History</span>
-              </Link>
-            </div>
-
-            {/* Right side - Profile dropdown and mobile back button */}
-            <div className="flex items-center space-x-2">
-              {/* Mobile-only back button */}
-              <Link
-                to="/history"
-                className="sm:hidden flex items-center justify-center p-2 bg-secondary/10 hover:bg-secondary/20 rounded-lg transition-colors"
-                title="Back to History"
-              >
-                <svg className="w-4 h-4 text-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                </svg>
-              </Link>
-              
-              {/* Profile dropdown */}
-              <div className="relative" data-profile-dropdown>
-                <button
-                  onClick={() => setShowProfileDropdown(!showProfileDropdown)}
-                  className="flex items-center space-x-1 sm:space-x-2 px-2 sm:px-3 py-2 rounded-lg bg-card hover:bg-accent transition-colors border border-border"
-                >
-                  <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-primary/20 flex items-center justify-center">
-                    <svg className="w-3 h-3 sm:w-4 sm:h-4 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                    </svg>
-                  </div>
-                  <span className="text-xs sm:text-sm font-medium hidden xs:inline">Profile</span>
-                  <svg className={`w-3 h-3 sm:w-4 sm:h-4 transition-transform ${showProfileDropdown ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                  </svg>
-                </button>
-
-                {/* Dropdown menu */}
-                {showProfileDropdown && (
-                  <div className="absolute right-0 mt-2 w-40 sm:w-48 bg-card rounded-lg shadow-lg border border-border z-50">
-                    <div className="py-1">
-                      <Link
-                        to="/profile"
-                        className="flex items-center px-3 sm:px-4 py-2 text-xs sm:text-sm text-foreground hover:bg-accent transition-colors"
-                        onClick={() => setShowProfileDropdown(false)}
-                      >
-                        <svg className="w-3 h-3 sm:w-4 sm:h-4 mr-2 sm:mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                        </svg>
-                        My Profile
-                      </Link>
-                      <Link
-                        to="/my-requests"
-                        className="flex items-center px-3 sm:px-4 py-2 text-xs sm:text-sm text-foreground hover:bg-accent transition-colors"
-                        onClick={() => setShowProfileDropdown(false)}
-                      >
-                        <svg className="w-3 h-3 sm:w-4 sm:h-4 mr-2 sm:mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                        </svg>
-                        My Requests
-                      </Link>
-                      <div className="border-t border-border my-1"></div>
-                      <button
-                        onClick={() => {
-                          setShowProfileDropdown(false)
-                          handleSignOut()
-                        }}
-                        className="flex items-center w-full px-3 sm:px-4 py-2 text-xs sm:text-sm text-destructive hover:bg-destructive/10 transition-colors"
-                      >
-                        <svg className="w-3 h-3 sm:w-4 sm:h-4 mr-2 sm:mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                        </svg>
-                        Sign Out
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
+      <Header 
+        title={portfolio?.name || 'Portfolio'}
+        icon={
+          <svg className="w-3 h-3 sm:w-4 sm:h-4 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+          </svg>
+        }
+        showBackButton={true}
+        backTo="/history"
+        backTitle="Back to History"
+      />
       
       <div className="max-w-2xl mx-auto py-8 px-4 sm:px-6 lg:px-8 pb-24 sm:pb-8">
         <Logo className="mb-12" />
@@ -819,7 +600,7 @@ function PortfolioComponent() {
                   setNewPortfolioName(portfolio.name)
                   setShowRenameModal(true)
                 }}
-                className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-accent rounded-lg"
+                className="p-1 hover:bg-accent rounded-lg"
                 title="Rename Portfolio"
               >
                 <svg
