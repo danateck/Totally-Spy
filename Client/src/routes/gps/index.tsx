@@ -1,3 +1,8 @@
+/*
+here we create a map for the user to see, 
+the location id being detected and displayed both in text and on the map
+the user can manualy change the location and the the pin on the map will change too
+*/ 
 import { createFileRoute } from '@tanstack/react-router'
 import { useEffect, useState } from 'react'
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet'
@@ -84,7 +89,7 @@ function RouteComponent() {
 
   return (
     <div className="w-full h-screen flex flex-col items-center">
-      {/* Address display */}
+      {/* Address text display */}
       <div className="mt-2 text-gray-700 text-sm text-center">
         <strong>Your location:</strong>{' '}
         {isManualMode ? manualAddress || '(empty)' : address}
@@ -117,7 +122,7 @@ function RouteComponent() {
         </>
       )}
 
-      {/* Map */}
+      {/* display Map with detected location*/}
       <MapContainer
         center={location}
         zoom={15}
