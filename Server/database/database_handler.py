@@ -236,17 +236,22 @@ def share_portfolio_with_user(portfolio_id: int, requesting_user_id: int, target
     raise RuntimeError("Database connection failed.")
 
 # Get all portfolios where the user is a member (including owner/editor/viewer)
-def get_portfolios_for_user(user_id: int) -> list[tuple[int, str]]:
+def get_portfolios_for_user(user_id: int) -> list[tuple[int, str, str]]:
+    """
+    Returns portfolios with their roles in a single query.
+    Returns: [(portfolio_id, portfolio_name, user_role)]
+    """
     conn = get_db_connection()
     portfolios = []
     if conn:
         try:
             with conn.cursor() as cur:
                 cur.execute("""
-                    SELECT p.id, p.name
+                    SELECT p.id, p.name, pm.role
                     FROM portfolios p
                     JOIN portfolio_members pm ON p.id = pm.portfolio_id
-                    WHERE pm.user_id = %s;
+                    WHERE pm.user_id = %s
+                    ORDER BY p.name;
                 """, (user_id,))
                 portfolios = cur.fetchall()
         except Exception as e:
@@ -428,14 +433,14 @@ def get_user_portfolios_and_unassigned_recordings(user_id: int) -> dict:
     and their scans that are not assigned to any portfolio.
     Format:
     {
-        "portfolios": [(portfolio_id, name)],
+        "portfolios": [(portfolio_id, name, role)],
         "recordings": [(scan_id, scan_time, decrypted_text)]
     }
     """
     result = {"portfolios": [], "recordings": []}
 
     try:
-        # get portfolios for user
+        # get portfolios for user (now includes roles)
         result["portfolios"] = get_portfolios_for_user(user_id)
         user_name = get_user_name(user_id)
         if user_name:
@@ -533,38 +538,50 @@ def insert_user(username: str, password: str) -> int | None:
         finally:
             conn.close()
 
-def insert_scan(username: str, detected_text: str) -> None:
+def insert_scan(
+    username: str,
+    detected_text: str,
+    best_frame_base64: str = None,
+    latitude: Optional[float] = None,
+    longitude: Optional[float] = None
+) -> Optional[int]:
     conn = get_db_connection()
     if conn:
         try: 
-            # Get the user_id based on the username
             with conn.cursor() as cur:
                 user_id = get_user_id(username)
-
                 if user_id is None:
                     logger.warning(f"No user found with username: {username}")
-                    return None  # Return None if user is not found
+                    return None
                 
                 encrypted_text = encrypt_data(user_id, detected_text)
                 if encrypted_text is None:
                     logger.warning("Encryption failed!")
-                    return
+                    return None
                 
-                # Create a default name with formatted date (e.g., "21 Apr 2025 07:46 Recording")
                 current_time = datetime.now()
                 default_name = f"{current_time.strftime('%d %b %Y %H:%M')} Recording"
+
                 
-                cur.execute(
-                    "INSERT INTO scan_history (user_id, detected_text, name) VALUES (%s, %s, %s);",
-                    (user_id, encrypted_text, default_name)
-                )
+                query = """
+                    INSERT INTO scan_history 
+                    (user_id, detected_text, name, best_frame_base64, latitude, longitude) 
+                    VALUES (%s, %s, %s, %s, %s, %s)
+                    RETURNING id;
+                """
+                values = (user_id, encrypted_text, default_name, best_frame_base64, latitude, longitude)
+
+                cur.execute(query, values)
+                scan_id = cur.fetchone()[0]
                 conn.commit()
-                logger.info(f"Scan history added successfully!")
+                logger.info(f"Scan history added successfully with ID: {scan_id}")
+                return scan_id
         except psycopg2.Error as e:
             logger.error(f"Error inserting scan history: {e}")
+            return None
         finally:
             conn.close()
-
+    return None
 
 
 def encrypt_data(user_id: int, plaintext: str) -> Optional[str]:
@@ -875,23 +892,59 @@ def ensure_scan_history_columns():
                     WHERE table_name = 'scan_history' AND column_name = 'name';
                 """)
                 if not cur.fetchone():
-                    # Add name column if it doesn't exist
-                    cur.execute("""
-                        ALTER TABLE scan_history 
-                        ADD COLUMN name TEXT;
-                    """)
-                    # Update existing rows with default names based on scan_time
-                    cur.execute("""
-                        UPDATE scan_history 
-                        SET name = scan_time::text 
-                        WHERE name IS NULL;
-                    """)
+                    cur.execute("ALTER TABLE scan_history ADD COLUMN name TEXT;")
+                    cur.execute("UPDATE scan_history SET name = scan_time::text WHERE name IS NULL;")
                     conn.commit()
-                    logger.info("Added name column to scan_history table")
+
+                # Check if best_frame_base64 column exists
+                cur.execute("""
+                    SELECT column_name 
+                    FROM information_schema.columns 
+                    WHERE table_name = 'scan_history' AND column_name = 'best_frame_base64';
+                """)
+                if not cur.fetchone():
+                    cur.execute("ALTER TABLE scan_history ADD COLUMN best_frame_base64 TEXT;")
+                    conn.commit()
+                    logger.info("Added best_frame_base64 column to scan_history table")
+
+                # Check if is_favorite column exists
+                cur.execute("""
+                    SELECT column_name 
+                    FROM information_schema.columns 
+                    WHERE table_name = 'scan_history' AND column_name = 'is_favorite';
+                """)
+                if not cur.fetchone():
+                    cur.execute("ALTER TABLE scan_history ADD COLUMN is_favorite BOOLEAN DEFAULT FALSE;")
+                    conn.commit()
+                    logger.info("Added is_favorite column to scan_history table")
+
+                # Check if latitude column exists
+                cur.execute("""
+                    SELECT column_name 
+                    FROM information_schema.columns 
+                    WHERE table_name = 'scan_history' AND column_name = 'latitude';
+                """)
+                if not cur.fetchone():
+                    cur.execute("ALTER TABLE scan_history ADD COLUMN latitude DOUBLE PRECISION;")
+                    conn.commit()
+                    logger.info("Added latitude column to scan_history table")
+
+                # Check if longitude column exists
+                cur.execute("""
+                    SELECT column_name 
+                    FROM information_schema.columns 
+                    WHERE table_name = 'scan_history' AND column_name = 'longitude';
+                """)
+                if not cur.fetchone():
+                    cur.execute("ALTER TABLE scan_history ADD COLUMN longitude DOUBLE PRECISION;")
+                    conn.commit()
+                    logger.info("Added longitude column to scan_history table")
+
         except Exception as e:
             logger.error(f"Error ensuring scan_history columns: {e}")
         finally:
             conn.close()
+
 
 def update_existing_scan_names():
     """Update existing scan names to use the new format."""
@@ -1022,37 +1075,37 @@ def save_best_frame_to_db(scan_id: int, user_id: int, image_base64: str):
     finally:
         conn.close()
 
-def ensure_scan_history_columns():
-    """Ensure all required columns exist in the scan_history table."""
+def toggle_scan_favorite(scan_id: int, user_id: int) -> bool:
+    """
+    Toggle the favorite status of a scan if it belongs to the user.
+    Returns the new favorite status (True if now favorite, False if not).
+    """
     conn = get_db_connection()
-    if conn:
-        try:
-            with conn.cursor() as cur:
-                # Check if name column exists
-                cur.execute("""
-                    SELECT column_name 
-                    FROM information_schema.columns 
-                    WHERE table_name = 'scan_history' AND column_name = 'name';
-                """)
-                if not cur.fetchone():
-                    cur.execute("ALTER TABLE scan_history ADD COLUMN name TEXT;")
-                    cur.execute("UPDATE scan_history SET name = scan_time::text WHERE name IS NULL;")
-                    conn.commit()
+    if not conn:
+        logger.error("Failed to connect to database")
+        return False
 
-                # Check if best_frame_base64 column exists
-                cur.execute("""
-                    SELECT column_name 
-                    FROM information_schema.columns 
-                    WHERE table_name = 'scan_history' AND column_name = 'best_frame_base64';
-                """)
-                if not cur.fetchone():
-                    cur.execute("ALTER TABLE scan_history ADD COLUMN best_frame_base64 TEXT;")
-                    conn.commit()
-                    logger.info("Added best_frame_base64 column to scan_history table")
-        except Exception as e:
-            logger.error(f"Error ensuring scan_history columns: {e}")
-        finally:
-            conn.close()
+    try:
+        with conn.cursor() as cur:
+            # Check if the scan belongs to the user and get current favorite status
+            cur.execute("SELECT is_favorite FROM scan_history WHERE id = %s AND user_id = %s;", (scan_id, user_id))
+            result = cur.fetchone()
+            if not result:
+                logger.warning(f"Scan {scan_id} not found or doesn't belong to user {user_id}")
+                return False
+
+            current_favorite = result[0] or False  # Handle NULL values
+            new_favorite = not current_favorite
+
+            # Update the favorite status
+            cur.execute("UPDATE scan_history SET is_favorite = %s WHERE id = %s;", (new_favorite, scan_id))
+            conn.commit()
+            return new_favorite
+    except Exception as e:
+        logger.error(f"Error toggling favorite for scan {scan_id}: {e}")
+        return False
+    finally:
+        conn.close()
 
 def get_scan_history_by_id(user_id: int, record_id: int) -> list[tuple[int, str, str, Optional[str]]]:
     conn = get_db_connection()
@@ -1075,3 +1128,138 @@ def get_scan_history_by_id(user_id: int, record_id: int) -> list[tuple[int, str,
             return []
         finally:
             conn.close()
+
+def get_scan_history_paginated(username: str, page: int = 1, limit: int = 20, search: str = "", sort: str = "newest", date_filter: str = "all", favorites_only: bool = False) -> dict:
+    """
+    Get paginated scan history with server-side filtering, sorting, and date filtering.
+    Returns: {
+        "records": [(id, scan_time, name)],
+        "total_count": int,
+        "page": int,
+        "limit": int,
+        "total_pages": int
+    }
+    """
+    conn = get_db_connection()
+    if not conn:
+        logger.error("Failed to get database connection")
+        return {
+            "records": [],
+            "total_count": 0,
+            "page": page,
+            "limit": limit,
+            "total_pages": 0
+        }
+    
+    try:
+        with conn.cursor() as cur:
+            # Get user_id
+            cur.execute("SELECT id FROM users WHERE username = %s;", (username,))
+            user_id_result = cur.fetchone()
+            if not user_id_result:
+                logger.warning(f"No user found with username: {username}")
+                return {
+                    "records": [],
+                    "total_count": 0,
+                    "page": page,
+                    "limit": limit,
+                    "total_pages": 0
+                }
+            
+            user_id = user_id_result[0]
+            
+            # Build search condition
+            search_condition = ""
+            search_params = [user_id]
+            if search.strip():
+                search_condition = "AND name ILIKE %s"
+                search_params.append(f"%{search.strip()}%")
+            
+            # Build favorites filter condition
+            favorites_condition = ""
+            if favorites_only:
+                favorites_condition = "AND is_favorite = TRUE"
+            
+            # Build date filter condition
+            date_condition = ""
+            if date_filter == "today":
+                date_condition = "AND DATE(scan_time) = CURRENT_DATE"
+            elif date_filter == "week":
+                date_condition = "AND scan_time >= CURRENT_DATE - INTERVAL '7 days'"
+            elif date_filter == "month":
+                date_condition = "AND scan_time >= CURRENT_DATE - INTERVAL '30 days'"
+            
+            # Build sort order
+            sort_order = "ORDER BY scan_time DESC"  # default newest
+            if sort == "oldest":
+                sort_order = "ORDER BY scan_time ASC"
+            elif sort == "name":
+                sort_order = "ORDER BY name ASC"
+            
+            # Get total count for pagination
+            count_query = f"""
+                SELECT COUNT(*) 
+                FROM scan_history 
+                WHERE user_id = %s {search_condition} {favorites_condition} {date_condition};
+            """
+            cur.execute(count_query, search_params)
+            total_count = cur.fetchone()[0]
+            
+            if total_count == 0:
+                return {
+                    "records": [],
+                    "total_count": 0,
+                    "page": page,
+                    "limit": limit,
+                    "total_pages": 0
+                }
+            
+            # Calculate pagination
+            total_pages = (total_count + limit - 1) // limit  # Ceiling division
+            offset = (page - 1) * limit
+            
+            # Get paginated records
+            data_query = f"""
+                SELECT id, scan_time, detected_text, name, is_favorite 
+                FROM scan_history 
+                WHERE user_id = %s {search_condition} {favorites_condition} {date_condition}
+                {sort_order}
+                LIMIT %s OFFSET %s;
+            """
+            data_params = search_params + [limit, offset]
+            cur.execute(data_query, data_params)
+            scans = cur.fetchall()
+            
+            # Decrypt and process records
+            decrypted_scans = []
+            for scan in scans:
+                try:
+                    decrypted_text = decrypt_data(user_id, scan[2])
+                    if decrypted_text is not None:
+                        # Return (id, scan_time, name, is_favorite)
+                        decrypted_scans.append((scan[0], scan[1], scan[3] or "Unnamed", scan[4] or False))
+                    else:
+                        logger.warning(f"Skipping scan {scan[0]} due to decryption failure")
+                except Exception as decrypt_error:
+                    logger.warning(f"Error decrypting scan {scan[0]}: {decrypt_error}")
+                    continue
+            
+            return {
+                "records": decrypted_scans,
+                "total_count": total_count,
+                "page": page,
+                "limit": limit,
+                "total_pages": total_pages
+            }
+            
+    except Exception as e:
+        logger.error(f"Error fetching paginated scan history for {username}: {e}")
+        return {
+            "records": [],
+            "total_count": 0,
+            "page": page,
+            "limit": limit,
+            "total_pages": 0
+        }
+    finally:
+        conn.close()

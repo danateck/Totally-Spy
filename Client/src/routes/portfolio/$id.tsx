@@ -1,7 +1,8 @@
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
 import { Logo } from '@/components/logo/logo'
 import { ScanDetails } from '@/components/scan-details'
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, useCallback } from 'react'
+import { useAuth } from '@/hooks/useAuth'
 
 interface Scan {
   id: number
@@ -24,15 +25,175 @@ export const Route = createFileRoute('/portfolio/$id')({
   validateSearch: (search: Record<string, unknown>) => {
     return search
   },
+  params: {
+    parse: (params) => {
+      const id = params.id
+      if (!id || typeof id !== 'string') {
+        throw new Error('Portfolio ID is required')
+      }
+      if (isNaN(Number(id))) {
+        throw new Error('Portfolio ID must be a valid number')
+      }
+      return { id }
+    },
+    stringify: ({ id }) => ({ id: String(id) }),
+  },
 })
 
 function PortfolioComponent() {
   const { id } = Route.useParams()
+  const navigate = useNavigate()
+  
+  // Add error handling for useAuth hook
+  let authData
+  try {
+    authData = useAuth()
+  } catch (error) {
+    console.error('Auth error:', error)
+    // Redirect to login if auth fails
+    useEffect(() => {
+      navigate({ to: '/login' })
+    }, [navigate])
+    return null
+  }
+  
+  const { logout } = authData
+  const [showProfileDropdown, setShowProfileDropdown] = useState(false)
 
+  // Move handleSignOut to the top so it's available in early returns
+  const handleSignOut = async () => {
+    try {
+      await logout()
+      navigate({ to: '/login' })
+    } catch (error) {
+      console.error('Sign out error:', error)
+      // Force navigation even if logout fails
+      navigate({ to: '/login' })
+    }
+  }
+
+  // Handle click outside to close profile dropdown - move this up too
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (showProfileDropdown) {
+        const target = event.target as Element
+        if (!target.closest('[data-profile-dropdown]')) {
+          setShowProfileDropdown(false)
+        }
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [showProfileDropdown])
 
   if (!id || isNaN(Number(id))) {
     return (
-      <div className="min-h-screen bg-background text-foreground">
+      <div className="min-h-screen bg-background text-foreground"
+        style={{ backgroundImage: "url('/images/background.jpg')" }}>
+        
+        {/* Header with Profile */}
+        <div className="sticky top-0 z-50 bg-background/80 backdrop-blur-sm border-b border-border">
+          <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="flex items-center justify-between h-14 sm:h-16">
+              {/* Left side - Page title */}
+              <div className="flex items-center space-x-2 sm:space-x-3 flex-1 min-w-0">
+                <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                  <svg className="w-3 h-3 sm:w-4 sm:h-4 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                  </svg>
+                </div>
+                <h1 className="text-base sm:text-lg font-semibold text-foreground truncate">Portfolio</h1>
+                
+                {/* Back to History button - hidden on very small screens, visible on sm+ */}
+                <Link
+                  to="/history"
+                  className="hidden sm:flex items-center px-2 py-1 sm:px-3 sm:py-1.5 bg-secondary/10 hover:bg-secondary/20 rounded-lg transition-colors ml-2 sm:ml-4"
+                  title="Back to History"
+                >
+                  <svg className="w-3 h-3 sm:w-4 sm:h-4 text-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                  </svg>
+                  <span className="ml-1 text-xs sm:text-sm font-medium text-secondary">History</span>
+                </Link>
+              </div>
+
+              {/* Right side - Profile dropdown and mobile back button */}
+              <div className="flex items-center space-x-2">
+                {/* Mobile-only back button */}
+                <Link
+                  to="/history"
+                  className="sm:hidden flex items-center justify-center p-2 bg-secondary/10 hover:bg-secondary/20 rounded-lg transition-colors"
+                  title="Back to History"
+                >
+                  <svg className="w-4 h-4 text-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                  </svg>
+                </Link>
+                
+                {/* Profile dropdown */}
+                <div className="relative" data-profile-dropdown>
+                  <button
+                    onClick={() => setShowProfileDropdown(!showProfileDropdown)}
+                    className="flex items-center space-x-1 sm:space-x-2 px-2 sm:px-3 py-2 rounded-lg bg-card hover:bg-accent transition-colors border border-border"
+                  >
+                    <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-primary/20 flex items-center justify-center">
+                      <svg className="w-3 h-3 sm:w-4 sm:h-4 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                      </svg>
+                    </div>
+                    <span className="text-xs sm:text-sm font-medium hidden xs:inline">Profile</span>
+                    <svg className={`w-3 h-3 sm:w-4 sm:h-4 transition-transform ${showProfileDropdown ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </button>
+
+                  {/* Dropdown menu */}
+                  {showProfileDropdown && (
+                    <div className="absolute right-0 mt-2 w-40 sm:w-48 bg-card rounded-lg shadow-lg border border-border z-50">
+                      <div className="py-1">
+                        <Link
+                          to="/profile"
+                          className="flex items-center px-3 sm:px-4 py-2 text-xs sm:text-sm text-foreground hover:bg-accent transition-colors"
+                          onClick={() => setShowProfileDropdown(false)}
+                        >
+                          <svg className="w-3 h-3 sm:w-4 sm:h-4 mr-2 sm:mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                          </svg>
+                          My Profile
+                        </Link>
+                        <Link
+                          to="/my-requests"
+                          className="flex items-center px-3 sm:px-4 py-2 text-xs sm:text-sm text-foreground hover:bg-accent transition-colors"
+                          onClick={() => setShowProfileDropdown(false)}
+                        >
+                          <svg className="w-3 h-3 sm:w-4 sm:h-4 mr-2 sm:mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                          </svg>
+                          My Requests
+                        </Link>
+                        <div className="border-t border-border my-1"></div>
+                        <button
+                          onClick={() => {
+                            setShowProfileDropdown(false)
+                            handleSignOut()
+                          }}
+                          className="flex items-center w-full px-3 sm:px-4 py-2 text-xs sm:text-sm text-destructive hover:bg-destructive/10 transition-colors"
+                        >
+                          <svg className="w-3 h-3 sm:w-4 sm:h-4 mr-2 sm:mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                          </svg>
+                          Sign Out
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <div className="max-w-2xl mx-auto py-12 px-4">
           <Logo className="mb-12" />
           <div className="text-center">
@@ -47,8 +208,6 @@ function PortfolioComponent() {
     )
   }
 
-
-  const navigate = useNavigate()
   const [portfolio, setPortfolio] = useState<{ name: string; role: string } | null>(null)
   const [scans, setScans] = useState<Scan[]>([])
   const [members, setMembers] = useState<Member[]>([])
@@ -58,8 +217,6 @@ function PortfolioComponent() {
   const [showAddMemberModal, setShowAddMemberModal] = useState(false)
   const [newMemberUsername, setNewMemberUsername] = useState('')
   const [newMemberRole, setNewMemberRole] = useState('editor')
-  const [showAddScanModal, setShowAddScanModal] = useState(false)
-  const [availableScans, setAvailableScans] = useState<Scan[]>([])
   const [showRenameModal, setShowRenameModal] = useState(false)
   const [newPortfolioName, setNewPortfolioName] = useState('')
   const [showDeleteModal, setShowDeleteModal] = useState(false)
@@ -76,14 +233,13 @@ function PortfolioComponent() {
   const dropdownRef = useRef<HTMLDivElement>(null)
   const searchTimeoutRef = useRef<number | null>(null)
 
-  const handleError = (err: Error | string) => {
+  const handleError = useCallback((err: Error | string) => {
     const errorMessage = err instanceof Error ? err.message : err
     setError(errorMessage)
     setShowErrorDialog(true)
     // Close any open modals
     setShowAddMemberModal(false)
-    setShowAddScanModal(false)
-  }
+  }, [])
 
   // Fetch users for autocomplete based on search term
   const fetchUsers = async (searchTerm: string) => {
@@ -237,7 +393,7 @@ function PortfolioComponent() {
   }, [])
 
   
-  const fetchPortfolioData = async () => {
+  const fetchPortfolioData = useCallback(async () => {
     setLoading(true)
     try {
       // Fetch portfolio data using POST
@@ -287,23 +443,7 @@ function PortfolioComponent() {
       })
       console.log('Transformed scans for ScanDetails:', transformedScans)
 
-      // Compare with regular recordings - let's also fetch from the regular endpoint to compare
-      try {
-        const regularResponse = await fetch('/portfolio/overview', {
-          credentials: 'include'
-        })
-        if (regularResponse.ok) {
-          const regularData = await regularResponse.json()
-          console.log('Regular recordings data structure:', regularData)
-          console.log('Comparing scan 744 data:')
-          console.log('- Portfolio scan 744:', transformedScans.find((s: Scan) => s.id === 744))
-          console.log('- Regular recordings scan 744:', regularData.recordings?.find((r: any) => r.id === 744))
-        }
-      } catch (e) {
-        console.log('Could not fetch regular recordings for comparison')
-      }
-
-      // Rest of your existing code...
+      // Fetch portfolio members
       const membersResponse = await fetch(`/portfolio/${id}/members`, {
         credentials: 'include',
         headers: {
@@ -333,29 +473,16 @@ function PortfolioComponent() {
     } finally {
       setLoading(false)
     }
-  }
-
-  const fetchAvailableScans = async () => {
-    try {
-      const response = await fetch('/portfolio/overview', {
-        credentials: 'include'
-      })
-      if (!response.ok) throw new Error('Failed to fetch available scans')
-      const data = await response.json()
-      setAvailableScans(data.unassigned_recordings || [])
-    } catch (err) {
-      handleError(err instanceof Error ? err.message : 'Failed to fetch available scans')
-    }
-  }
+  }, [id, handleError])
 
   useEffect(() => {
-  if (id && !isNaN(Number(id))) {
-    fetchPortfolioData()
-  } else {
-    setError('Invalid portfolio ID')
-    setLoading(false)
-  }
-}, [id])
+    if (id && !isNaN(Number(id))) {
+      fetchPortfolioData()
+    } else {
+      setError('Invalid portfolio ID')
+      setLoading(false)
+    }
+  }, [id, fetchPortfolioData])
 
   // Cleanup timeout on unmount
   useEffect(() => {
@@ -396,31 +523,6 @@ function PortfolioComponent() {
       fetchPortfolioData()
     } catch (err) {
       handleError(err instanceof Error ? err.message : 'Failed to add member')
-    }
-  }
-
-  const handleAddScan = async (scanId: number) => {
-    try {
-      const response = await fetch('/portfolio/add_scan', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify({
-          portfolioId: parseInt(id),
-          scanId: scanId
-        })
-      })
-
-      if (!response.ok) {
-        throw new Error('Failed to add scan')
-      }
-
-      setShowAddScanModal(false)
-      fetchPortfolioData()
-    } catch (err) {
-      handleError(err instanceof Error ? err.message : 'Failed to add scan')
     }
   }
 
@@ -584,7 +686,7 @@ function PortfolioComponent() {
     return (
       <div className="min-h-screen bg-background text-foreground"
         style={{ backgroundImage: "url('/images/background.jpg')" }}>
-        <div className="max-w-2xl mx-auto py-12 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-2xl mx-auto py-12 px-4">
           <Logo className="mb-12" />
           <div className="space-y-4">
             <div className="h-8 bg-card/70 rounded-lg w-1/3 animate-pulse"></div>
@@ -602,12 +704,115 @@ function PortfolioComponent() {
   return (
     <div className="min-h-screen bg-background text-foreground"
       style={{ backgroundImage: "url('/images/background.jpg')" }}>
-      <div className="max-w-2xl mx-auto py-12 px-4 sm:px-6 lg:px-8">
+      
+      {/* Header with Profile */}
+      <div className="sticky top-0 z-50 bg-background/80 backdrop-blur-sm border-b border-border">
+        <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between h-14 sm:h-16">
+            {/* Left side - Page title */}
+            <div className="flex items-center space-x-2 sm:space-x-3 flex-1 min-w-0">
+              <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                <svg className="w-3 h-3 sm:w-4 sm:h-4 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                </svg>
+              </div>
+              <h1 className="text-base sm:text-lg font-semibold text-foreground truncate">{portfolio?.name || 'Portfolio'}</h1>
+              
+              {/* Back to History button - hidden on very small screens, visible on sm+ */}
+              <Link
+                to="/history"
+                className="hidden sm:flex items-center px-2 py-1 sm:px-3 sm:py-1.5 bg-secondary/10 hover:bg-secondary/20 rounded-lg transition-colors ml-2 sm:ml-4"
+                title="Back to History"
+              >
+                <svg className="w-3 h-3 sm:w-4 sm:h-4 text-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                </svg>
+                <span className="ml-1 text-xs sm:text-sm font-medium text-secondary">History</span>
+              </Link>
+            </div>
+
+            {/* Right side - Profile dropdown and mobile back button */}
+            <div className="flex items-center space-x-2">
+              {/* Mobile-only back button */}
+              <Link
+                to="/history"
+                className="sm:hidden flex items-center justify-center p-2 bg-secondary/10 hover:bg-secondary/20 rounded-lg transition-colors"
+                title="Back to History"
+              >
+                <svg className="w-4 h-4 text-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                </svg>
+              </Link>
+              
+              {/* Profile dropdown */}
+              <div className="relative" data-profile-dropdown>
+                <button
+                  onClick={() => setShowProfileDropdown(!showProfileDropdown)}
+                  className="flex items-center space-x-1 sm:space-x-2 px-2 sm:px-3 py-2 rounded-lg bg-card hover:bg-accent transition-colors border border-border"
+                >
+                  <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-primary/20 flex items-center justify-center">
+                    <svg className="w-3 h-3 sm:w-4 sm:h-4 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                    </svg>
+                  </div>
+                  <span className="text-xs sm:text-sm font-medium hidden xs:inline">Profile</span>
+                  <svg className={`w-3 h-3 sm:w-4 sm:h-4 transition-transform ${showProfileDropdown ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+
+                {/* Dropdown menu */}
+                {showProfileDropdown && (
+                  <div className="absolute right-0 mt-2 w-40 sm:w-48 bg-card rounded-lg shadow-lg border border-border z-50">
+                    <div className="py-1">
+                      <Link
+                        to="/profile"
+                        className="flex items-center px-3 sm:px-4 py-2 text-xs sm:text-sm text-foreground hover:bg-accent transition-colors"
+                        onClick={() => setShowProfileDropdown(false)}
+                      >
+                        <svg className="w-3 h-3 sm:w-4 sm:h-4 mr-2 sm:mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                        </svg>
+                        My Profile
+                      </Link>
+                      <Link
+                        to="/my-requests"
+                        className="flex items-center px-3 sm:px-4 py-2 text-xs sm:text-sm text-foreground hover:bg-accent transition-colors"
+                        onClick={() => setShowProfileDropdown(false)}
+                      >
+                        <svg className="w-3 h-3 sm:w-4 sm:h-4 mr-2 sm:mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                        My Requests
+                      </Link>
+                      <div className="border-t border-border my-1"></div>
+                      <button
+                        onClick={() => {
+                          setShowProfileDropdown(false)
+                          handleSignOut()
+                        }}
+                        className="flex items-center w-full px-3 sm:px-4 py-2 text-xs sm:text-sm text-destructive hover:bg-destructive/10 transition-colors"
+                      >
+                        <svg className="w-3 h-3 sm:w-4 sm:h-4 mr-2 sm:mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                        </svg>
+                        Sign Out
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <div className="max-w-2xl mx-auto py-8 px-4 sm:px-6 lg:px-8 pb-24 sm:pb-8">
         <Logo className="mb-12" />
 
-        <div className="flex justify-between items-center mb-6">
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
           <div className="flex items-center space-x-2 group">
-            <h1 className="text-2xl font-bold text-foreground">{portfolio?.name}</h1>
+            <h1 className="text-xl sm:text-2xl font-bold text-foreground">{portfolio?.name}</h1>
             {portfolio?.role === 'owner' && (
               <button
                 onClick={() => {
@@ -618,7 +823,7 @@ function PortfolioComponent() {
                 title="Rename Portfolio"
               >
                 <svg
-                  className="w-5 h-5 text-muted-foreground hover:text-foreground"
+                  className="w-4 h-4 sm:w-5 sm:h-5 text-muted-foreground hover:text-foreground"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -636,10 +841,10 @@ function PortfolioComponent() {
           {portfolio?.role === 'owner' && (
             <button
               onClick={() => setShowDeleteModal(true)}
-              className="px-4 py-2 text-red-800 border border-red-800 rounded-lg hover:bg-red-800 hover:text-white transition-colors flex items-center"
+              className="px-3 py-2 sm:px-4 sm:py-2 text-sm sm:text-base text-red-800 border border-red-800 rounded-lg hover:bg-red-800 hover:text-white transition-colors flex items-center w-fit"
             >
               <svg
-                className="w-5 h-5 mr-2"
+                className="w-4 h-4 mr-2"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -651,15 +856,16 @@ function PortfolioComponent() {
                   d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
                 />
               </svg>
-              Delete Portfolio
+              <span className="hidden sm:inline">Delete Portfolio</span>
+              <span className="sm:hidden">Delete</span>
             </button>
           )}
         </div>
 
         {/* Members Section */}
         <div className="mb-8">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-xl font-semibold">Members</h2>
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-4">
+            <h2 className="text-lg sm:text-xl font-semibold">Members</h2>
             {portfolio?.role !== 'viewer' && (
               <button
                 onClick={() => {
@@ -669,7 +875,7 @@ function PortfolioComponent() {
                   setFilteredUsers([])
                   setShowAddMemberModal(true)
                 }}
-                className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
+                className="px-3 py-2 sm:px-4 sm:py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors text-sm sm:text-base w-fit"
               >
                 Add Member
               </button>
@@ -679,25 +885,25 @@ function PortfolioComponent() {
             {members.map((member) => (
               <div
                 key={member.username}
-                className="p-4 bg-card rounded-xl shadow-lg border border-border group"
+                className="p-3 sm:p-4 bg-card rounded-xl shadow-lg border border-border group"
               >
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                   <div>
-                    <h3 className="text-lg font-medium">{member.username}</h3>
+                    <h3 className="text-base sm:text-lg font-medium">{member.username}</h3>
                     <p className="text-sm text-muted-foreground">Role: {member.role}</p>
                   </div>
                   {portfolio?.role === 'owner' && member.role !== 'owner' && (
-                    <div className="flex items-center space-x-2">
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
                       <button
                         onClick={() => {
                           setSelectedMember(member)
                           setNewRole(member.role)
                           setShowChangeRoleModal(true)
                         }}
-                        className="opacity-0 group-hover:opacity-100 transition-opacity px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors flex items-center space-x-2"
+                        className="opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity px-3 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors flex items-center justify-center space-x-2 text-sm"
                       >
                         <svg
-                          className="w-4 h-4"
+                          className="w-3 h-3 sm:w-4 sm:h-4"
                           fill="none"
                           stroke="currentColor"
                           viewBox="0 0 24 24"
@@ -716,10 +922,10 @@ function PortfolioComponent() {
                           setSelectedMember(member)
                           setShowDeleteMemberModal(true)
                         }}
-                        className="opacity-0 group-hover:opacity-100 transition-opacity px-4 py-2 bg-red-800 text-white rounded-lg hover:bg-red-900 transition-colors flex items-center space-x-2"
+                        className="opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity px-3 py-2 bg-red-800 text-white rounded-lg hover:bg-red-900 transition-colors flex items-center justify-center space-x-2 text-sm"
                       >
                         <svg
-                          className="w-4 h-4"
+                          className="w-3 h-3 sm:w-4 sm:h-4"
                           fill="none"
                           stroke="currentColor"
                           viewBox="0 0 24 24"
@@ -743,22 +949,35 @@ function PortfolioComponent() {
 
         {/* Records Section */}
         <div>
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-semibold">Records</h2>
-            <button
-              onClick={() => fetchPortfolioData()}
-              disabled={loading}
-              className="px-4 py-2 bg-green-600 text-black rounded-lg font-semibold hover:bg-green-700 transition-colors flex items-center"
-            >
-              <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-              </svg>
-              Refresh
-            </button>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
+            <h2 className="text-lg sm:text-xl font-semibold">Records</h2>
+            <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
+              <Link
+                to="/gps/$gps-portfolio"
+                params={{ "gps-portfolio": id }}
+                className="px-3 py-2 sm:px-4 sm:py-2 bg-green-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors flex items-center w-fit text-sm sm:text-base"
+              >
+                <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+                GPS Folder
+              </Link>
+              <button
+                onClick={() => fetchPortfolioData()}
+                disabled={loading}
+                className="px-3 py-2 sm:px-4 sm:py-2 bg-green-600 text-black rounded-lg font-semibold hover:bg-green-700 transition-colors flex items-center w-fit text-sm sm:text-base"
+              >
+                <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                Refresh
+              </button>
+            </div>
           </div>
           {scans.length === 0 ? (
             <div className="text-center py-8 bg-card rounded-xl border border-border">
-              <p className="text-muted-foreground text-lg">No records found in this portfolio</p>
+              <p className="text-muted-foreground text-base sm:text-lg">No records found in this portfolio</p>
             </div>
           ) : (
             <div className="space-y-2">
@@ -777,9 +996,9 @@ function PortfolioComponent() {
 
         {/* Add Member Modal */}
         {showAddMemberModal && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-            <div className="bg-card p-6 rounded-xl shadow-lg w-full max-w-md">
-              <h2 className="text-xl font-bold mb-4">Add Member</h2>
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-card p-4 sm:p-6 rounded-xl shadow-lg w-full max-w-md">
+              <h2 className="text-lg sm:text-xl font-bold mb-4">Add Member</h2>
               <div className="space-y-4">
                 <div className="relative">
                   <label htmlFor="username" className="block text-sm font-medium text-muted-foreground mb-1">
@@ -803,7 +1022,7 @@ function PortfolioComponent() {
                       setTimeout(() => setShowUserDropdown(false), 150)
                     }}
                     placeholder="Start typing username..."
-                    className="w-full px-4 py-2 rounded-lg bg-background border border-border focus:ring-2 focus:ring-primary focus:border-transparent"
+                    className="w-full px-3 py-2 sm:px-4 sm:py-2 rounded-lg bg-background border border-border focus:ring-2 focus:ring-primary focus:border-transparent text-sm sm:text-base"
                     autoComplete="off"
                   />
                   
@@ -832,7 +1051,7 @@ function PortfolioComponent() {
                                 }
                               }}
                               disabled={isExistingMember}
-                              className={`w-full px-4 py-3 text-left transition-colors border-b border-gray-700 last:border-b-0 ${
+                              className={`w-full px-3 py-2 sm:px-4 sm:py-3 text-left transition-colors border-b border-gray-700 last:border-b-0 text-sm ${
                                 isExistingMember 
                                   ? 'bg-gray-700 text-gray-500 cursor-not-allowed'
                                   : index === selectedUserIndex 
@@ -850,17 +1069,12 @@ function PortfolioComponent() {
                           )
                         })
                       ) : (
-                        <div className="px-4 py-3 text-gray-300 text-sm">
+                        <div className="px-3 py-2 sm:px-4 sm:py-3 text-gray-300 text-sm">
                           No users found matching "{newMemberUsername}"
                         </div>
                       )}
                     </div>
                   )}
-                  
-                  {/* Debug info - always show for testing */}
-                  <div className="text-xs text-gray-500 mt-1">
-                    Debug: showDropdown={showUserDropdown.toString()}, users={filteredUsers.length}, members={members.length}, text="{newMemberUsername}"
-                  </div>
                 </div>
                 <div>
                   <label htmlFor="role" className="block text-sm font-medium text-muted-foreground mb-1">
@@ -870,14 +1084,14 @@ function PortfolioComponent() {
                     id="role"
                     value={newMemberRole}
                     onChange={(e) => setNewMemberRole(e.target.value)}
-                    className="w-full px-4 py-2 rounded-lg bg-background border border-border"
+                    className="w-full px-3 py-2 sm:px-4 sm:py-2 rounded-lg bg-background border border-border text-sm sm:text-base"
                   >
                     <option value="editor">Editor</option>
                     <option value="viewer">Viewer</option>
                   </select>
                 </div>
               </div>
-              <div className="flex justify-end space-x-4 mt-6">
+              <div className="flex flex-col sm:flex-row justify-end gap-3 sm:gap-4 mt-6">
                 <button
                   onClick={() => {
                     setShowAddMemberModal(false)
@@ -886,14 +1100,14 @@ function PortfolioComponent() {
                     setShowUserDropdown(false)
                     setFilteredUsers([])
                   }}
-                  className="px-4 py-2 bg-muted text-muted-foreground rounded-lg hover:bg-muted/80"
+                  className="px-4 py-2 bg-muted text-muted-foreground rounded-lg hover:bg-muted/80 order-2 sm:order-1"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleAddMember}
                   disabled={!newMemberUsername.trim()}
-                  className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed order-1 sm:order-2"
                 >
                   Add
                 </button>
@@ -902,60 +1116,31 @@ function PortfolioComponent() {
           </div>
         )}
 
-        {/* Add Scan Modal */}
-        {showAddScanModal && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center">
-            <div className="bg-card p-6 rounded-xl shadow-lg w-full max-w-md">
-              <h2 className="text-xl font-bold mb-4">Add Record</h2>
-              <div className="space-y-2 max-h-96 overflow-y-auto">
-                {availableScans.map((scan) => (
-                  <button
-                    key={scan.id}
-                    onClick={() => handleAddScan(scan.id)}
-                    className="w-full p-4 bg-background rounded-lg hover:bg-accent transition-colors text-left"
-                  >
-                    <h3 className="text-lg font-medium">{scan.name}</h3>
-                    <p className="text-sm text-muted-foreground">{scan.date}</p>
-                  </button>
-                ))}
-              </div>
-              <div className="flex justify-end mt-4">
-                <button
-                  onClick={() => setShowAddScanModal(false)}
-                  className="px-4 py-2 bg-muted text-muted-foreground rounded-lg hover:bg-muted/80"
-                >
-                  Close
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
         {/* Rename Portfolio Modal */}
         {showRenameModal && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-            <div className="bg-card p-6 rounded-xl shadow-lg w-full max-w-md">
-              <h2 className="text-xl font-bold mb-4">Rename Portfolio</h2>
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-card p-4 sm:p-6 rounded-xl shadow-lg w-full max-w-md">
+              <h2 className="text-lg sm:text-xl font-bold mb-4">Rename Portfolio</h2>
               <input
                 type="text"
                 value={newPortfolioName}
                 onChange={(e) => setNewPortfolioName(e.target.value)}
                 placeholder="Enter new portfolio name"
-                className="w-full px-4 py-2 rounded-lg bg-background border border-border mb-4"
+                className="w-full px-3 py-2 sm:px-4 sm:py-2 rounded-lg bg-background border border-border mb-4 text-sm sm:text-base"
               />
-              <div className="flex justify-end space-x-4">
+              <div className="flex flex-col sm:flex-row justify-end gap-3 sm:gap-4">
                 <button
                   onClick={() => {
                     setShowRenameModal(false)
                     setNewPortfolioName('')
                   }}
-                  className="px-4 py-2 bg-muted text-muted-foreground rounded-lg hover:bg-muted/80"
+                  className="px-4 py-2 bg-muted text-muted-foreground rounded-lg hover:bg-muted/80 order-2 sm:order-1"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleRenamePortfolio}
-                  className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90"
+                  className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 order-1 sm:order-2"
                 >
                   Rename
                 </button>
@@ -966,22 +1151,22 @@ function PortfolioComponent() {
 
         {/* Delete Portfolio Modal */}
         {showDeleteModal && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-            <div className="bg-card p-6 rounded-xl shadow-lg w-full max-w-md">
-              <h2 className="text-xl font-bold mb-4">Delete Portfolio</h2>
-              <p className="text-destructive mb-6">
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-card p-4 sm:p-6 rounded-xl shadow-lg w-full max-w-md">
+              <h2 className="text-lg sm:text-xl font-bold mb-4">Delete Portfolio</h2>
+              <p className="text-destructive mb-6 text-sm sm:text-base">
                 Are you sure you want to delete this portfolio? This action cannot be undone.
               </p>
-              <div className="flex justify-end space-x-4">
+              <div className="flex flex-col sm:flex-row justify-end gap-3 sm:gap-4">
                 <button
                   onClick={() => setShowDeleteModal(false)}
-                  className="px-4 py-2 bg-muted text-muted-foreground rounded-lg hover:bg-muted/80"
+                  className="px-4 py-2 bg-muted text-muted-foreground rounded-lg hover:bg-muted/80 order-2 sm:order-1"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleDeletePortfolio}
-                  className="px-4 py-2 bg-red-800 text-white rounded-lg hover:bg-red-950 transition-colors"
+                  className="px-4 py-2 bg-red-800 text-white rounded-lg hover:bg-red-950 transition-colors order-1 sm:order-2"
                 >
                   Delete
                 </button>
@@ -992,32 +1177,32 @@ function PortfolioComponent() {
 
         {/* Change Role Modal */}
         {showChangeRoleModal && selectedMember && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-            <div className="bg-card p-6 rounded-xl shadow-lg w-full max-w-md">
-              <h2 className="text-xl font-bold mb-4">Change Member Role</h2>
-              <p className="mb-4">Change role for {selectedMember.username}</p>
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-card p-4 sm:p-6 rounded-xl shadow-lg w-full max-w-md">
+              <h2 className="text-lg sm:text-xl font-bold mb-4">Change Member Role</h2>
+              <p className="mb-4 text-sm sm:text-base">Change role for {selectedMember.username}</p>
               <select
                 value={newRole}
                 onChange={(e) => setNewRole(e.target.value)}
-                className="w-full px-4 py-2 rounded-lg bg-background border border-border mb-4"
+                className="w-full px-3 py-2 sm:px-4 sm:py-2 rounded-lg bg-background border border-border mb-4 text-sm sm:text-base"
               >
                 <option value="editor">Editor</option>
                 <option value="viewer">Viewer</option>
               </select>
-              <div className="flex justify-end space-x-4">
+              <div className="flex flex-col sm:flex-row justify-end gap-3 sm:gap-4">
                 <button
                   onClick={() => {
                     setShowChangeRoleModal(false)
                     setSelectedMember(null)
                     setNewRole('')
                   }}
-                  className="px-4 py-2 bg-muted text-muted-foreground rounded-lg hover:bg-muted/80"
+                  className="px-4 py-2 bg-muted text-muted-foreground rounded-lg hover:bg-muted/80 order-2 sm:order-1"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleChangeRole}
-                  className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90"
+                  className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 order-1 sm:order-2"
                 >
                   Change Role
                 </button>
@@ -1028,25 +1213,25 @@ function PortfolioComponent() {
 
         {/* Delete Member Modal */}
         {showDeleteMemberModal && selectedMember && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-            <div className="bg-card p-6 rounded-xl shadow-lg w-full max-w-md">
-              <h2 className="text-xl font-bold mb-4">Remove Member</h2>
-              <p className="text-destructive mb-6">
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-card p-4 sm:p-6 rounded-xl shadow-lg w-full max-w-md">
+              <h2 className="text-lg sm:text-xl font-bold mb-4">Remove Member</h2>
+              <p className="text-destructive mb-6 text-sm sm:text-base">
                 Are you sure you want to remove {selectedMember.username} from this portfolio? This action cannot be undone.
               </p>
-              <div className="flex justify-end space-x-4">
+              <div className="flex flex-col sm:flex-row justify-end gap-3 sm:gap-4">
                 <button
                   onClick={() => {
                     setShowDeleteMemberModal(false)
                     setSelectedMember(null)
                   }}
-                  className="px-4 py-2 bg-muted text-muted-foreground rounded-lg hover:bg-muted/80"
+                  className="px-4 py-2 bg-muted text-muted-foreground rounded-lg hover:bg-muted/80 order-2 sm:order-1"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleDeleteMember}
-                  className="px-4 py-2 bg-red-800 text-white rounded-lg hover:bg-red-900 transition-colors"
+                  className="px-4 py-2 bg-red-800 text-white rounded-lg hover:bg-red-900 transition-colors order-1 sm:order-2"
                 >
                   Remove
                 </button>
@@ -1057,12 +1242,12 @@ function PortfolioComponent() {
 
         {/* Error Dialog */}
         {showErrorDialog && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-            <div className="bg-card p-6 rounded-xl shadow-lg w-full max-w-md">
-              <div className="text-destructive text-lg font-semibold mb-4">
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-card p-4 sm:p-6 rounded-xl shadow-lg w-full max-w-md">
+              <div className="text-destructive text-base sm:text-lg font-semibold mb-4">
                 Error
               </div>
-              <p className="text-destructive mb-6">{error}</p>
+              <p className="text-destructive mb-6 text-sm sm:text-base">{error}</p>
               <div className="flex justify-end">
                 <button
                   onClick={() => setShowErrorDialog(false)}
@@ -1075,11 +1260,11 @@ function PortfolioComponent() {
           </div>
         )}
 
-        {/* Navigation Buttons */}
-        <div className="fixed bottom-8 left-0 right-0 flex justify-center space-x-4">
+        {/* Mobile-friendly bottom navigation */}
+        <div className="mt-6 flex justify-center">
           <Link
             to="/history"
-            className="px-6 py-3 bg-card hover:bg-accent rounded-lg font-semibold transition-all duration-200 flex items-center text-foreground hover:text-accent-foreground border border-border"
+            className="flex items-center justify-center px-6 py-3 bg-card hover:bg-accent rounded-lg font-semibold transition-all duration-200 text-foreground hover:text-accent-foreground border border-border"
           >
             <span className="mr-2">←</span> Back to History
           </Link>

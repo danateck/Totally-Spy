@@ -3,6 +3,11 @@ import Webcam from "react-webcam";
 import { ZoomIn, ZoomOut, Maximize, Minimize, Focus, Settings, RotateCcw, Camera, RefreshCw, X } from "lucide-react";
 import { getFilterStyle, processImage } from "@/lib/image-processing";
 import type { QualityLevel } from "@/lib/image-processing";
+import { getTopImages } from "@/lib/getTopImages";
+import { CAMERA_CONFIG } from "@/config/camera";
+
+// No need for custom interface as we're using 'any' type for constraints
+// to bypass TypeScript limitations with the browser APIs
 
 const WebcamCapture: React.FC<{
   onCapture?: (imageSrc: string) => void;
@@ -18,6 +23,11 @@ const WebcamCapture: React.FC<{
   const mediaStreamRef = useRef<MediaStream | null>(null);
   const processedImageRef = useRef<string | null>(null);
   const lastCaptureTimeRef = useRef<number>(0);
+
+  // Add new refs for image capture and scoring
+  const capturedImagesRef = useRef<HTMLImageElement[]>([]);
+  const captureIntervalRef = useRef<number | undefined>(undefined);
+  const sendIntervalRef = useRef<number | undefined>(undefined);
 
   // Connect webcam ref to video element for processing
   useEffect(() => {
@@ -179,8 +189,8 @@ const WebcamCapture: React.FC<{
     return getFilterStyle(quality, sharpness, enhancementLevel);
   }, [quality, sharpness, enhancementLevel]);
 
-  // Enhanced capture with post-processing for quality
-  const capture = useCallback(() => {
+  // Function to capture and score an image
+  const captureAndScoreImage = useCallback(() => {
     if (!webcamRef.current || !canvasRef.current || !videoRef.current) return;
     
     const video = videoRef.current;
@@ -196,7 +206,8 @@ const WebcamCapture: React.FC<{
       return;
     }
     
-    const maxDimension = 2000;
+    // Calculate target dimensions while maintaining aspect ratio
+    const maxDimension = CAMERA_CONFIG.MAX_IMAGE_DIMENSION;
     let targetWidth = video.videoWidth;
     let targetHeight = video.videoHeight;
     
@@ -210,14 +221,18 @@ const WebcamCapture: React.FC<{
       }
     }
     
+    // Set canvas dimensions
     canvas.width = targetWidth;
     canvas.height = targetHeight;
     
+    // Enable image smoothing
     ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = 'high';
     
+    // Draw the video frame
     ctx.drawImage(video, 0, 0, targetWidth, targetHeight);
     
+    // Process the image with enhancements
     processImage(
       ctx,
       targetWidth,
@@ -230,10 +245,88 @@ const WebcamCapture: React.FC<{
       opticalZoomSupported
     );
     
-    const imageSrc = canvas.toDataURL('image/jpeg', 0.95);
-    processedImageRef.current = imageSrc;
+    // Create a new image element and set its source
+    const img = new Image();
+    img.src = canvas.toDataURL('image/jpeg', CAMERA_CONFIG.JPEG_QUALITY);
+    
+    // Add to captured images array
+    capturedImagesRef.current.push(img);
+    
+    // Keep only the last N images to prevent memory issues
+    if (capturedImagesRef.current.length > CAMERA_CONFIG.MAX_STORED_IMAGES) {
+      capturedImagesRef.current.shift();
+    }
   }, [webcamRef, canvasRef, videoRef, quality, sharpness, enhancementLevel, zoomLevel, position, opticalZoomSupported]);
-  
+
+  // Function to send top images
+  const sendTopImages = useCallback(() => {
+    if (!onCapture || capturedImagesRef.current.length === 0) return;
+
+    // Wait for all images to load
+    const loadedImages = capturedImagesRef.current.filter(img => img.complete);
+    if (loadedImages.length === 0) return;
+
+    // Get top N images using the scoring function
+    const topImages = getTopImages(loadedImages, CAMERA_CONFIG.TOP_IMAGES_TO_SEND);
+    
+    // Send each top image
+    topImages.forEach((img: HTMLImageElement) => {
+      if (onCapture) {
+        onCapture(img.src);
+      }
+    });
+
+    // Clear the captured images array
+    capturedImagesRef.current = [];
+  }, [onCapture]);
+
+  // Handle recording interval
+  useEffect(() => {
+    if (isRecording) {
+      // Start capturing images at configured interval
+      captureIntervalRef.current = window.setInterval(captureAndScoreImage, CAMERA_CONFIG.CAPTURE_INTERVAL_MS);
+      
+      // Start sending top images at configured interval
+      sendIntervalRef.current = window.setInterval(sendTopImages, CAMERA_CONFIG.SEND_INTERVAL_MS);
+    } else {
+      // Clear intervals
+      if (captureIntervalRef.current) {
+        window.clearInterval(captureIntervalRef.current);
+      }
+      if (sendIntervalRef.current) {
+        window.clearInterval(sendIntervalRef.current);
+      }
+      // Clear captured images
+      capturedImagesRef.current = [];
+    }
+
+    return () => {
+      if (captureIntervalRef.current) {
+        window.clearInterval(captureIntervalRef.current);
+      }
+      if (sendIntervalRef.current) {
+        window.clearInterval(sendIntervalRef.current);
+      }
+    };
+  }, [isRecording, captureAndScoreImage, sendTopImages]);
+
+  // Add event listeners for mouse movements outside the component
+  useEffect(() => {
+    const handleGlobalMouseUp = () => {
+      setIsDragging(false);
+    };
+    
+    if (isDragging) {
+      window.addEventListener('mouseup', handleGlobalMouseUp);
+      window.addEventListener('mouseleave', handleGlobalMouseUp);
+    }
+    
+    return () => {
+      window.removeEventListener('mouseup', handleGlobalMouseUp);
+      window.removeEventListener('mouseleave', handleGlobalMouseUp);
+    };
+  }, [isDragging]);
+
   // Handle zooming in with limits
   const handleZoomIn = () => {
     const newZoom = Math.min(zoomLevel + 0.125, opticalZoomSupported ? maxOpticalZoom : 4);
@@ -355,50 +448,6 @@ const WebcamCapture: React.FC<{
     setIsDragging(false);
   };
 
-  // Handle recording interval
-  useEffect(() => {
-    if (isRecording) {
-      capture();
-      
-      intervalRef.current = window.setInterval(() => {
-        const now = Date.now();
-        capture();
-        if (processedImageRef.current && onCapture) {
-          onCapture(processedImageRef.current);
-          lastCaptureTimeRef.current = now;
-        }
-      }, 750);
-    } else {
-      if (intervalRef.current) {
-        window.clearInterval(intervalRef.current);
-      }
-      processedImageRef.current = null;
-    }
-
-    return () => {
-      if (intervalRef.current) {
-        window.clearInterval(intervalRef.current);
-      }
-    };
-  }, [isRecording, capture, onCapture]);
-
-  // Add event listeners for mouse movements outside the component
-  useEffect(() => {
-    const handleGlobalMouseUp = () => {
-      setIsDragging(false);
-    };
-    
-    if (isDragging) {
-      window.addEventListener('mouseup', handleGlobalMouseUp);
-      window.addEventListener('mouseleave', handleGlobalMouseUp);
-    }
-    
-    return () => {
-      window.removeEventListener('mouseup', handleGlobalMouseUp);
-      window.removeEventListener('mouseleave', handleGlobalMouseUp);
-    };
-  }, [isDragging]);
-
   // Toggle autofocus
   const toggleAutoFocus = () => {
     const newAutoFocus = !autoFocus;
@@ -467,15 +516,13 @@ const WebcamCapture: React.FC<{
       >
         {/* Top overlay indicators */}
         <div className={`absolute ${isMobile ? 'top-2 left-2 right-2' : 'top-4 left-4 right-4'} flex justify-between items-start z-30 pointer-events-none`}>
-          {/* Zoom indicator */}
-          <div className={`bg-black/70 text-white ${isMobile ? 'px-2 py-1 text-xs' : 'px-3 py-1 text-sm'} rounded-full font-medium backdrop-blur-sm`}>
-            {Math.round(zoomLevel * 100)}% {opticalZoomSupported ? '(Optical)' : ''}
-          </div>
-          
           {/* Quality indicator */}
           <div className={`bg-black/70 text-white ${isMobile ? 'px-2 py-1 text-xs' : 'px-3 py-1 text-sm'} rounded-full font-medium backdrop-blur-sm`}>
             {quality === "ultra" ? "ULTRA HD" : quality === "high" ? "HD" : "Standard"}
           </div>
+          
+          {/* Empty space for balance */}
+          <div></div>
         </div>
         
         {/* Camera controls - top right - compact on mobile */}
@@ -563,30 +610,8 @@ const WebcamCapture: React.FC<{
         {/* Two-row layout for mobile to fit all controls */}
         {isMobile ? (
           <div className="space-y-2 p-3">
-            {/* Top row - Navigation and main controls */}
-            <div className="flex items-center justify-between">
-              {/* Back/Forward navigation buttons */}
-              <div className="flex space-x-2">
-                <button 
-                  onClick={() => window.history.back()}
-                  className="p-2 rounded-full bg-white/20 text-white hover:bg-white/30 transition-all"
-                  title="Go Back"
-                >
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="m15 18-6-6 6-6"/>
-                  </svg>
-                </button>
-                <button 
-                  onClick={() => window.history.forward()}
-                  className="p-2 rounded-full bg-white/20 text-white hover:bg-white/30 transition-all"
-                  title="Go Forward"
-                >
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="m9 18 6-6-6-6"/>
-                  </svg>
-                </button>
-              </div>
-
+            {/* Top row - Main controls */}
+            <div className="flex items-center justify-center">
               {/* Central camera control button */}
               <button 
                 onClick={toggleCameraActive}
@@ -598,15 +623,6 @@ const WebcamCapture: React.FC<{
                 title={isCameraActive ? "Stop Camera" : "Start Camera"}
               >
                 {isCameraActive ? '⏹ STOP' : '▶ START'}
-              </button>
-
-              {/* Camera switch */}
-              <button 
-                onClick={toggleCamera}
-                className="p-2 rounded-full bg-white/20 text-white hover:bg-white/30 transition-all"
-                title="Switch Camera"
-              >
-                <RefreshCw size={18} />
               </button>
             </div>
 
@@ -662,28 +678,6 @@ const WebcamCapture: React.FC<{
         ) : (
           /* Desktop single-row layout */
           <div className="flex items-center justify-center space-x-4 p-4">
-            {/* Back/Forward */}
-            <div className="flex space-x-2">
-              <button 
-                onClick={() => window.history.back()}
-                className="p-3 rounded-full bg-white/20 text-white hover:bg-white/30 transition-all"
-                title="Go Back"
-              >
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="m15 18-6-6 6-6"/>
-                </svg>
-              </button>
-              <button 
-                onClick={() => window.history.forward()}
-                className="p-3 rounded-full bg-white/20 text-white hover:bg-white/30 transition-all"
-                title="Go Forward"
-              >
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="m9 18 6-6-6-6"/>
-                </svg>
-              </button>
-            </div>
-
             {/* Zoom controls */}
             <button 
               onClick={handleResetZoom}
@@ -742,15 +736,6 @@ const WebcamCapture: React.FC<{
               title={isCameraActive ? "Stop Camera" : "Start Camera"}
             >
               {isCameraActive ? '⏹ STOP' : '▶ START'}
-            </button>
-
-            {/* Camera switch */}
-            <button 
-              onClick={toggleCamera}
-              className="p-3 rounded-full bg-white/20 text-white hover:bg-white/30 transition-all"
-              title="Switch Camera"
-            >
-              <RefreshCw size={20} />
             </button>
           </div>
         )}

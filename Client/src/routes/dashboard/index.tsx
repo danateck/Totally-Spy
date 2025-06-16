@@ -1,14 +1,8 @@
 import { Logo } from '@/components/logo/logo'
 import { createFileRoute, useRouter, Link } from '@tanstack/react-router'
 import { useAuth } from '@/hooks/useAuth'
-import {
-  AlertDialog,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
-import { useState } from 'react'
+import VideoUpload from '@/components/video-upload/VideoUpload'
+import { useState, useEffect } from 'react'
 
 export const Route = createFileRoute('/dashboard/')({
   component: DashboardComponent,
@@ -17,11 +11,11 @@ export const Route = createFileRoute('/dashboard/')({
 function DashboardComponent() {
   const { logout } = useAuth()
   const router = useRouter()
-  const [showDialog, setShowDialog] = useState(false)
+  const [showVideoUpload, setShowVideoUpload] = useState(false)
+  const [showProfileDropdown, setShowProfileDropdown] = useState(false)
 
   const handleUploadVideo = () => {
-    setShowDialog(true)
-    setTimeout(() => setShowDialog(false), 1000)
+    setShowVideoUpload(true)
   }
 
   const handleSignOut = async () => {
@@ -29,53 +23,115 @@ function DashboardComponent() {
     router.navigate({ to: '/login' })
   }
 
+  const handleCloseVideoUpload = () => {
+    setShowVideoUpload(false)
+  }
+
+  // Handle click outside to close profile dropdown
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (showProfileDropdown) {
+        const target = event.target as Element
+        if (!target.closest('[data-profile-dropdown]')) {
+          setShowProfileDropdown(false)
+        }
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [showProfileDropdown])
+
   return (
     <div
       className="min-h-screen bg-background text-foreground relative"
       style={{ backgroundColor: "black" }}
-
     >
-      {/* Sign Out Button in top-left corner */}
-      <div className="absolute top-4 left-4">
-        <button
-          onClick={handleSignOut}
-          className="text-sm text-white bg-black px-4 py-2 rounded-md shadow hover:bg-muted transition-all border border-border"
-        >
-          Sign Out
-        </button>
-      </div>
+      {/* Header with Profile */}
+      <div className="sticky top-0 z-50 bg-background/80 backdrop-blur-sm border-b border-border">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between h-14 sm:h-16">
+            {/* Left side - Page title */}
+            <div className="flex items-center space-x-2 sm:space-x-3 flex-1 min-w-0">
+              <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                <svg className="w-3 h-3 sm:w-4 sm:h-4 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2-2z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5v4" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 5v4" />
+                </svg>
+              </div>
+              <h1 className="text-base sm:text-lg font-semibold text-foreground truncate">Dashboard</h1>
+            </div>
 
-      {/* Profile + Requests buttons in top-right corner */}
-      <div className="absolute top-4 right-4 flex gap-2">
-        <Link
-          to="/profile"
-          className="text-sm text-white bg-card px-4 py-2 rounded-md shadow hover:bg-accent transition-all border border-border"
-        >
-          My Profile
-        </Link>
+            {/* Right side - Profile dropdown */}
+            <div className="relative" data-profile-dropdown>
+              <button
+                onClick={() => setShowProfileDropdown(!showProfileDropdown)}
+                className="flex items-center space-x-1 sm:space-x-2 px-2 sm:px-3 py-2 rounded-lg bg-card hover:bg-accent transition-colors border border-border"
+              >
+                <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-primary/20 flex items-center justify-center">
+                  <svg className="w-3 h-3 sm:w-4 sm:h-4 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                  </svg>
+                </div>
+                <span className="text-xs sm:text-sm font-medium hidden xs:inline">Profile</span>
+                <svg className={`w-3 h-3 sm:w-4 sm:h-4 transition-transform ${showProfileDropdown ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
 
-        <Link 
-          to="/my-requests"
-          className="text-sm text-white bg-card px-4 py-2 rounded-md shadow hover:bg-accent transition-all border border-border"
-        >
-          My Requests
-        </Link>
+              {/* Dropdown menu */}
+              {showProfileDropdown && (
+                <div className="absolute right-0 mt-2 w-40 sm:w-48 bg-card rounded-lg shadow-lg border border-border z-50">
+                  <div className="py-1">
+                    <Link
+                      to="/profile"
+                      className="flex items-center px-3 sm:px-4 py-2 text-xs sm:text-sm text-foreground hover:bg-accent transition-colors"
+                      onClick={() => setShowProfileDropdown(false)}
+                    >
+                      <svg className="w-3 h-3 sm:w-4 sm:h-4 mr-2 sm:mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                      </svg>
+                      My Profile
+                    </Link>
+                    <Link
+                      to="/my-requests"
+                      className="flex items-center px-3 sm:px-4 py-2 text-xs sm:text-sm text-foreground hover:bg-accent transition-colors"
+                      onClick={() => setShowProfileDropdown(false)}
+                    >
+                      <svg className="w-3 h-3 sm:w-4 sm:h-4 mr-2 sm:mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      </svg>
+                      My Requests
+                    </Link>
+                    <div className="border-t border-border my-1"></div>
+                    <button
+                      onClick={() => {
+                        setShowProfileDropdown(false)
+                        handleSignOut()
+                      }}
+                      className="flex items-center w-full px-3 sm:px-4 py-2 text-xs sm:text-sm text-destructive hover:bg-destructive/10 transition-colors"
+                    >
+                      <svg className="w-3 h-3 sm:w-4 sm:h-4 mr-2 sm:mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                      </svg>
+                      Sign Out
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
       </div>
 
       <div className="max-w-4xl mx-auto py-12 px-4 sm:px-6 lg:px-8">
         <Logo className="mb-12" />
 
-        {/* Alert Dialog */}
-        <AlertDialog open={showDialog} onOpenChange={setShowDialog}>
-          <AlertDialogContent className="bg-card border border-border">
-            <AlertDialogHeader>
-              <AlertDialogTitle className="text-primary">Coming Soon!</AlertDialogTitle>
-              <AlertDialogDescription className="text-muted-foreground">
-                Video upload feature will be available in a future update.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-          </AlertDialogContent>
-        </AlertDialog>
+        {/* Video Upload Modal */}
+        {showVideoUpload && (
+          <VideoUpload onClose={handleCloseVideoUpload} />
+        )}
 
         {/* Main Actions */}
         <div className="grid gap-6 md:grid-cols-3 mb-12">
@@ -146,20 +202,35 @@ function DashboardComponent() {
           </Link>
         </div>
 
-        {/* Navigation */}
-        <div className="flex justify-between">
-          <button
-            onClick={() => window.history.back()}
-            className="inline-flex items-center px-4 py-2 text-sm font-medium text-foreground bg-card border border-border rounded-lg hover:bg-accent transition-colors duration-200"
-          >
-            ← Back
-          </button>
-          <button
-            onClick={() => window.history.forward()}
-            className="inline-flex items-center px-4 py-2 text-sm font-medium text-foreground bg-card border border-border rounded-lg hover:bg-accent transition-colors duration-200"
-          >
-            Forward →
-          </button>
+        {/* Quick Tips Section */}
+        <div className="mt-8 bg-card/50 rounded-xl p-6 border border-border">
+          <div className="flex items-center mb-4">
+            <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center mr-3">
+              <svg className="w-3 h-3 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <h3 className="text-lg font-semibold text-foreground">Quick Tips</h3>
+          </div>
+          
+          <div className="grid gap-4 md:grid-cols-2 text-sm text-muted-foreground">
+            <div className="flex items-start space-x-3">
+              <div className="w-2 h-2 rounded-full bg-primary mt-2 flex-shrink-0"></div>
+              <p><span className="font-medium text-foreground">Upload videos</span> to analyze existing recordings</p>
+            </div>
+            <div className="flex items-start space-x-3">
+              <div className="w-2 h-2 rounded-full bg-primary mt-2 flex-shrink-0"></div>
+              <p><span className="font-medium text-foreground">Record live</span> to capture new content</p>
+            </div>
+            <div className="flex items-start space-x-3">
+              <div className="w-2 h-2 rounded-full bg-primary mt-2 flex-shrink-0"></div>
+              <p><span className="font-medium text-foreground">View history</span> to manage all your recordings</p>
+            </div>
+            <div className="flex items-start space-x-3">
+              <div className="w-2 h-2 rounded-full bg-primary mt-2 flex-shrink-0"></div>
+              <p><span className="font-medium text-foreground">Organize</span> recordings into portfolios</p>
+            </div>
+          </div>
         </div>
       </div>
     </div>
