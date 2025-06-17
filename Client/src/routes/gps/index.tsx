@@ -2,12 +2,14 @@
 here we create a map for the user to see, 
 the location id being detected and displayed both in text and on the map
 the user can manualy change the location and the the pin on the map will change too
+
 */ 
 import { createFileRoute } from '@tanstack/react-router'
 import { useEffect, useState } from 'react'
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
+import { Header } from '@/components/header/header'
 
 import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png'
 import markerIcon from 'leaflet/dist/images/marker-icon.png'
@@ -84,20 +86,20 @@ function RouteComponent() {
     }
   }
 
-  if (error) return <div className="text-red-600 text-center mt-10">{error}</div>
-  if (!location) return <div className="text-center mt-10">Loading Location...</div>
+  if (error) return <div className="text-red-500 text-center mt-10 font-mono bg-black p-4">{error}</div>
+  if (!location) return <div className="text-center mt-10 text-green-400 font-mono bg-black p-4">Loading Location...</div>
 
   return (
-    <div className="w-full h-screen flex flex-col items-center">
+    <div className="w-full h-screen bg-black text-green-400 flex flex-col items-center font-mono p-4">
       {/* Address text display */}
-      <div className="mt-2 text-gray-700 text-sm text-center">
+      <div className="mt-4 text-lg text-center">
         <strong>Your location:</strong>{' '}
         {isManualMode ? manualAddress || '(empty)' : address}
       </div>
 
       {/* Toggle manual input */}
       <button
-        className="mt-2 px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700"
+        className="mt-4 px-4 py-2 bg-green-700 text-black text-lg font-bold rounded hover:bg-green-600"
         onClick={() => setIsManualMode((prev) => !prev)}
       >
         {isManualMode ? 'Use Detected Address' : 'Edit Address Manually'}
@@ -105,38 +107,42 @@ function RouteComponent() {
 
       {/* Manual address input */}
       {isManualMode && (
-        <>
+        <div className="flex flex-col items-center w-full mt-4">
           <input
             type="text"
             value={manualAddress}
             onChange={(e) => setManualAddress(e.target.value)}
             placeholder="Enter address"
-            className="mt-2 p-2 border border-gray-300 rounded w-[80%] max-w-md"
+            className="p-3 text-white w-[90%] max-w-md border border-green-600 rounded"
           />
           <button
             onClick={geocodeAddress}
-            className="mt-2 px-3 py-1 bg-green-600 text-white text-sm rounded hover:bg-green-700"
+            className="mt-2 px-4 py-2 bg-green-700 text-black text-lg font-bold rounded hover:bg-green-600"
           >
             Set Address on Map
           </button>
-        </>
+        </div>
       )}
 
-      {/* display Map with detected location*/}
-      <MapContainer
-        center={location}
-        zoom={15}
-        scrollWheelZoom={true}
-        style={{ height: '90%', width: '100%' }}
-      >
-        <TileLayer
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          attribution='&copy; <a href="https://www.openstreetmap.org/">OpenStreetMap</a> contributors'
-        />
-        <Marker position={location}>
-          <Popup>📍 {isManualMode ? manualAddress || 'Manual location' : 'Detected location'}</Popup>
-        </Marker>
-      </MapContainer>
+      {/* Display Map */}
+      <div className="mt-6 border border-green-700 rounded overflow-hidden" style={{ width: '500px', height: '500px' }}>
+        <MapContainer
+          center={location}
+          zoom={15}
+          scrollWheelZoom={true}
+          style={{ height: '100%', width: '100%' }}
+        >
+          <TileLayer
+            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+            attribution=""
+          />
+          <Marker position={location}>
+            <Popup className="font-mono text-sm">
+              📍 {isManualMode ? manualAddress || 'Manual location' : 'Detected location'}
+            </Popup>
+          </Marker>
+        </MapContainer>
+      </div>
     </div>
   )
 }
