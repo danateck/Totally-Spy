@@ -8,7 +8,7 @@ from fastapi import HTTPException
 import logging
 from typing import Optional
 from datetime import datetime
-import pytz
+
 from pydantic import BaseModel
 
 # Load environment variables from .env file
@@ -559,8 +559,7 @@ def insert_scan(
                     logger.warning("Encryption failed!")
                     return None
                 
-                tz = pytz.timezone('Asia/Jerusalem')
-                current_time = datetime.now(tz)
+                current_time = datetime.now()
                 default_name = f"{current_time.strftime('%d %b %Y %H:%M')} Recording"
 
                 
@@ -577,13 +576,11 @@ def insert_scan(
                 conn.commit()
                 logger.info(f"Scan history added successfully with ID: {scan_id}")
                 return scan_id
-            
         except psycopg2.Error as e:
             logger.error(f"Error inserting scan history: {e}")
             return None
         finally:
             conn.close()
-            
     return None
 
 

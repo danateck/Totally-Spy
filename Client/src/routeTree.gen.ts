@@ -22,6 +22,7 @@ import { Route as GpsIndexImport } from './routes/gps/index'
 import { Route as DashboardIndexImport } from './routes/dashboard/index'
 import { Route as PortfolioIdImport } from './routes/portfolio/$id'
 import { Route as HistoryItemImport } from './routes/history/$item'
+import { Route as GpsGpsPortfolioImport } from './routes/gps/$gps-portfolio'
 
 // Create/Update Routes
 
@@ -91,6 +92,12 @@ const HistoryItemRoute = HistoryItemImport.update({
   getParentRoute: () => rootRoute,
 } as any)
 
+const GpsGpsPortfolioRoute = GpsGpsPortfolioImport.update({
+  id: '/gps/$gps-portfolio',
+  path: '/gps/$gps-portfolio',
+  getParentRoute: () => rootRoute,
+} as any)
+
 // Populate the FileRoutesByPath interface
 
 declare module '@tanstack/react-router' {
@@ -100,6 +107,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexImport
+      parentRoute: typeof rootRoute
+    }
+    '/gps/$gps-portfolio': {
+      id: '/gps/$gps-portfolio'
+      path: '/gps/$gps-portfolio'
+      fullPath: '/gps/$gps-portfolio'
+      preLoaderRoute: typeof GpsGpsPortfolioImport
       parentRoute: typeof rootRoute
     }
     '/history/$item': {
@@ -179,6 +193,7 @@ declare module '@tanstack/react-router' {
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/gps/$gps-portfolio': typeof GpsGpsPortfolioRoute
   '/history/$item': typeof HistoryItemRoute
   '/portfolio/$id': typeof PortfolioIdRoute
   '/dashboard': typeof DashboardIndexRoute
@@ -193,6 +208,7 @@ export interface FileRoutesByFullPath {
 
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/gps/$gps-portfolio': typeof GpsGpsPortfolioRoute
   '/history/$item': typeof HistoryItemRoute
   '/portfolio/$id': typeof PortfolioIdRoute
   '/dashboard': typeof DashboardIndexRoute
@@ -208,6 +224,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRoute
   '/': typeof IndexRoute
+  '/gps/$gps-portfolio': typeof GpsGpsPortfolioRoute
   '/history/$item': typeof HistoryItemRoute
   '/portfolio/$id': typeof PortfolioIdRoute
   '/dashboard/': typeof DashboardIndexRoute
@@ -224,6 +241,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/gps/$gps-portfolio'
     | '/history/$item'
     | '/portfolio/$id'
     | '/dashboard'
@@ -237,6 +255,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/gps/$gps-portfolio'
     | '/history/$item'
     | '/portfolio/$id'
     | '/dashboard'
@@ -250,6 +269,7 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/gps/$gps-portfolio'
     | '/history/$item'
     | '/portfolio/$id'
     | '/dashboard/'
@@ -265,6 +285,7 @@ export interface FileRouteTypes {
 
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  GpsGpsPortfolioRoute: typeof GpsGpsPortfolioRoute
   HistoryItemRoute: typeof HistoryItemRoute
   PortfolioIdRoute: typeof PortfolioIdRoute
   DashboardIndexRoute: typeof DashboardIndexRoute
@@ -279,6 +300,7 @@ export interface RootRouteChildren {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  GpsGpsPortfolioRoute: GpsGpsPortfolioRoute,
   HistoryItemRoute: HistoryItemRoute,
   PortfolioIdRoute: PortfolioIdRoute,
   DashboardIndexRoute: DashboardIndexRoute,
@@ -302,6 +324,7 @@ export const routeTree = rootRoute
       "filePath": "__root.tsx",
       "children": [
         "/",
+        "/gps/$gps-portfolio",
         "/history/$item",
         "/portfolio/$id",
         "/dashboard/",
@@ -316,6 +339,9 @@ export const routeTree = rootRoute
     },
     "/": {
       "filePath": "index.tsx"
+    },
+    "/gps/$gps-portfolio": {
+      "filePath": "gps/$gps-portfolio.tsx"
     },
     "/history/$item": {
       "filePath": "history/$item.tsx"
