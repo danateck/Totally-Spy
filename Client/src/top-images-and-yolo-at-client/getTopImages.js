@@ -1,6 +1,7 @@
 /* Calculating sharpness using a Laplacian
  using a grading system we rate screenshots by sharpness, contrass and colorfulness
- this will help us find the best picture to extract the text from
+ this will help us find the best picture to extract the text from 
+ this function is being done on the client side
 */
 function calculateSharpnessLaplacian(imageData, width, height) {
     const data = imageData.data;
