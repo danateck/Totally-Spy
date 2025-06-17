@@ -195,7 +195,7 @@ function ProfileComponent() {
                 <Button
                   onClick={() => setShowDeleteDialog(true)}
                   variant="destructive"
-                  className="w-full"
+                  className="w-full hover:bg-red-800 hover:text-white transition-colors duration-200"
                 >
                   Delete Account
                 </Button>
