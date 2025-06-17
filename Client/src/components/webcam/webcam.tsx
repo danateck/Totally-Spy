@@ -285,17 +285,7 @@ const WebcamCapture = forwardRef(function WebcamCapture(props: {
     if (isRecording && !isSessionActive) {
       startSession();
     } else if (!isRecording && isSessionActive) {
-      endSession().then(() => {
-        if (captureIntervalRef.current) {
-          window.clearInterval(captureIntervalRef.current);
-          captureIntervalRef.current = undefined;
-        }
-        if (sendIntervalRef.current) {
-          window.clearInterval(sendIntervalRef.current);
-          sendIntervalRef.current = undefined;
-        }
-        capturedImagesRef.current = [];
-      });
+      endSession();
     }
   }, [isRecording]);
 
@@ -529,6 +519,16 @@ const WebcamCapture = forwardRef(function WebcamCapture(props: {
   };
 
   const endSession = async () => {
+    // Clear intervals immediately
+    if (captureIntervalRef.current) {
+      window.clearInterval(captureIntervalRef.current);
+      captureIntervalRef.current = undefined;
+    }
+    if (sendIntervalRef.current) {
+      window.clearInterval(sendIntervalRef.current);
+      sendIntervalRef.current = undefined;
+    }
+    
     try {
       const response = await fetch("/record/session", {
         method: "POST",
