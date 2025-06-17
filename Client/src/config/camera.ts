@@ -1,8 +1,14 @@
+/*
+configurations for:
+  - get top image algorithm
+  - client capturing screenshots
+  - client sending the server pictures 
+  */
 export const CAMERA_CONFIG = {
     // Image capture settings
     CAPTURE_INTERVAL_MS: 50,        // How often to capture images
     MAX_STORED_IMAGES: 20,          // Maximum number of images to store in buffer
-    SEND_INTERVAL_MS: 750,          // How often to send top images to server
+    SEND_INTERVAL_MS: 375,          // How often to send top images to server
     TOP_IMAGES_TO_SEND: 3,          // Number of top images to send each time
     
     // Image quality settings
