@@ -34,29 +34,39 @@ class SessionManager:
             session = self.active_sessions[user_id]
             session.end_time = time.time()
             
-            # Analyze the collected data
             results = self._analyze_session_data(session)
             
-            # Format data for database storage
+            has_meaningful_data = False
+            
+            if results["detected_data"]:
+                has_meaningful_data = True
+            
+            if session.best_frame_base64:
+                has_meaningful_data = True
+            
+            if not has_meaningful_data:
+                del self.active_sessions[user_id]
+                return None
+            
             formatted_data = []
             
             for data_type, value_counts in session.data_counts.items():
                 if data_type == "POTENTIALLY_SENSITIVE":
-                    # Add all potentially sensitive items
                     for value, count in value_counts.items():
-                        if count > 1:  # Only include if found more than once
+                        if count > 1:
                             formatted_data.append((value, data_type))
                 else:
-                    # For other categories, add only the most frequent item
                     if value_counts:
                         most_frequent = max(value_counts.items(), key=lambda x: x[1])
-                        if most_frequent[1] > 1:  # Only include if found more than once
+                        if most_frequent[1] > 1:
                             formatted_data.append((most_frequent[0], data_type))
             
-            # Convert to string format for database
+            if not formatted_data and not session.best_frame_base64:
+                del self.active_sessions[user_id]
+                return None
+            
             formatted_string = '\n'.join(f"{label}:{value}" for value, label in formatted_data)
             
-            # Save to database
             from database.database_handler import insert_scan, get_user_name
             username = get_user_name(int(user_id)) if user_id.isdigit() else user_id
             scan_id = insert_scan(
@@ -70,7 +80,6 @@ class SessionManager:
             if scan_id:
                 results["scan_id"] = scan_id
             
-            # Clean up
             del self.active_sessions[user_id]
             
             return results
@@ -87,29 +96,22 @@ class SessionManager:
         session = self.active_sessions[user_id]
         session.total_frames += 1
         
-        # Update frame if it's better than current best
         if best_frame_base64 and frame_score > session.best_frame_score:
             session.best_frame_base64 = best_frame_base64
             session.best_frame_score = frame_score
             
-        # Update location if provided
         if location:
             session.location = location
             
-        # Classify and count the data
         detected_data = classify_text(text)
         otp_value = None
         for value, data_type in detected_data:
-            # Count all data types including OTP
             session.data_counts[data_type][value] += 1
-            # If this is an OTP, store it for potential return
             if data_type == "OTP":
                 otp_value = value
         
-        # Get current best results
         results = self._analyze_session_data(session)
         
-        # Only return OTP if it's the most frequent value in its category
         if otp_value and "OTP" in session.data_counts:
             otp_counts = session.data_counts["OTP"]
             if otp_value == max(otp_counts.items(), key=lambda x: x[1])[0]:
@@ -129,29 +131,23 @@ class SessionManager:
             "all_detected": {}  # Include all detected items with their counts
         }
         
-        # For each data type, find the most frequent items
         for data_type, value_counts in session.data_counts.items():
             if not value_counts:
                 continue
                 
-            # Sort by count and get the most frequent items
             sorted_items = sorted(value_counts.items(), key=lambda x: x[1], reverse=True)
             
-            # Store all detected items with their counts
             results["all_detected"][data_type] = [
                 {"value": value, "count": count}
                 for value, count in sorted_items
             ]
-            
-            # Get the most frequent value
+
             most_frequent = sorted_items[0][0]
             count = value_counts[most_frequent]
             
-            # Calculate confidence score (0-100)
             total_count = sum(value_counts.values())
             confidence = int((count / total_count) * 100) if total_count > 0 else 0
             
-            # Only include if it appears more than once to reduce false positives
             if count > 1:
                 results["detected_data"][data_type] = most_frequent
                 results["confidence_scores"][data_type] = confidence
